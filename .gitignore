@@ -1,0 +1,35 @@
+# node/vite
+node_modules/
+dist/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# сборочные архивы
+*.zip
+*.tar.gz
+
+# env
+.env
+.env.local
+.env.*.local
+
+# IDE/OS
+.DS_Store
+Thumbs.db
+
+# VS Code — полезные файлы оставляем, остальное игнорим
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# тесты/отчёты
+coverage/
+*.coverage
+
+# Chrome extension dev
+*.pem

@@ -1,0 +1,31 @@
+{
+  "name": "visual-bookmarks-extension",
+  "version": "0.1.4.9001",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:reload": "node scripts/dev-reload-server.cjs",
+    "preview": "vite preview",
+    "pack": "node scripts/pack.cjs",
+    "copy-wasm": "node scripts/copy-wasm.cjs",
+    "dev": "npm run copy-wasm && node scripts/dev-watch.cjs",
+    "build": "npm run copy-wasm && vite build && node scripts/postbuild.cjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.4",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/sql.js": "^1.4.9",
+    "@vitejs/plugin-react": "^4.3.1",
+    "archiver": "^7.0.1",
+    "chokidar": "^3.6.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "ws": "^8.18.0"
+  }
+}
