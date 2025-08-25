@@ -14,22 +14,22 @@ body[data-theme="dark"]{
 }
 html,body,#root{margin:0;padding:0}
 body{background:var(--bg);color:var(--fg)}
-body.popup{width:360px;height:540px}
-.app{display:flex;flex-direction:column;height:100%}
-.topbar { display:flex; gap:.5rem; align-items:center; overflow-x:auto; position: sticky; top: 0; z-index: 5; background: var(--bg); }
+body.popup{width:360px;height:540px;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;min-height:540px}
+.topbar { display:flex; gap:.5rem; align-items:center; overflow-x:auto; flex-shrink:0; background: var(--bg); border-bottom:1px solid var(--border); padding:8px; }
 .topitem { padding:.25rem .5rem; border-radius:.5rem; background:var(--bg-2); cursor:pointer; white-space:nowrap; position:relative; }
 .topitem.active { background:var(--bg-3); font-weight:600; }
 .top-actions { margin-left:.4rem; display:inline-flex; gap:.25rem; }
 .topbar .add{margin-left:auto;border:0;background:var(--accent);color:#fff;border-radius:12px;padding:6px 10px;cursor:pointer;flex:0 0 auto}
 .topbar button, .topbar select{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 8px;flex:0 0 auto}
-.main{padding:8px;overflow:auto;display:grid;grid-template-columns:1fr;gap:16px}
+.main{padding:8px;overflow:auto;display:grid;grid-template-columns:1fr;gap:16px;flex:1;min-height:0}
 @media (min-width: 900px){ .main{grid-template-columns:1.4fr 0.6fr} }
 .card{border:1px solid var(--border);border-radius:12px;padding:10px}
 .row{display:flex;gap:8px;align-items:center}
 input[type='text'],select{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg)}
 button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg);cursor:pointer}
 .muted{color:var(--muted);font-size:12px}
-.tree{padding:8px;overflow:auto}
+.tree{padding:8px;overflow:auto;height:100%}
 .tree-actions{
   display:flex;
   gap:8px;
@@ -37,6 +37,8 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
   border-bottom:1px dashed var(--border);
   padding-bottom:8px;
   align-items:center;         /* важно: вертикальное выравнивание */
+  position: relative; 
+  z-index: 2;
 }
 .node{margin-left:8px}
 .node-row{position:relative;display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:8px}
@@ -54,15 +56,13 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
 .link-wrap{display:flex;align-items:center;gap:6px;min-width:0}
 .link-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .footer{
-  position: sticky;
-  bottom: 0;
+  flex-shrink:0;
   background: var(--bg);
   border-top:1px solid var(--border);
   padding: 8px 12px;
   display:flex;
   justify-content: space-between;
   align-items:center;
-  z-index: 4;
 }
 .footer button{ padding:6px 10px; }
 .levels .level-btn{
@@ -78,4 +78,25 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
   background: color-mix(in oklab, var(--accent) 12%, transparent);
   border-color: var(--accent);
   font-weight: 600;
+}
+/* ----- панель уровней ----- */
+.levelbar {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: 8px;
+  flex-wrap: wrap;
+}
+.levelbar .chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.levelbar .chip.active {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  border-color: var(--accent);
 }

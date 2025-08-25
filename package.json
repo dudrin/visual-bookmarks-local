@@ -1,6 +1,6 @@
 {
   "name": "visual-bookmarks-extension",
-  "version": "0.1.4.9001",
+  "version": "0.1.5.0",
   "private": true,
   "type": "module",
   "scripts": {

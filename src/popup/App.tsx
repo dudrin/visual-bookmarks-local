@@ -18,6 +18,7 @@ import {
 } from "./sqlStorage"; // <— sqlStorage
 import "./popup.css";
 import Tree from "./Tree";
+import { useTreeStates } from "./useTreeStates";
 
 type SimpleTab = {
   id: number;
@@ -34,6 +35,9 @@ export default function App() {
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [forceExpand, setForceExpand] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Хук для управления состояниями деревьев
+  const { getState, updateState, removeState } = useTreeStates();
 
   // ---- вкладки для правого блока
   const [tabs, setTabs] = useState<SimpleTab[]>([]);
@@ -251,6 +255,7 @@ export default function App() {
     if (!activeId) return;
     if (!confirm("Удалить активное дерево? Это действие нельзя отменить.")) return;
     await deleteTree(activeId);
+    removeState(activeId); // Очищаем состояние UI
     const next = trees.filter((t) => t.id !== activeId);
     setTrees(next);
     setActiveId(next[0]?.id ?? null);
@@ -382,6 +387,8 @@ export default function App() {
                 await updateNodesFor(active.id, [node, ...active.nodes]);
               }}
               forceExpand={forceExpand}
+              uiState={getState(active.id)}
+              onUpdateUIState={(updater) => updateState(active.id, updater)}
             />
           ) : (
             <div className="muted">Создайте первое дерево</div>

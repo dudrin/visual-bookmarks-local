@@ -9,6 +9,18 @@ export type TreeNode = {
   mime?: string | null;      // тип, если это документ/изображение/архив и т.п.
 };
 
+// Состояние UI для каждого дерева
+export type TreeUIState = {
+  // раскрытые узлы по их ID
+  expandedNodes: Set<string>;
+  // текущий поисковый запрос
+  searchQuery: string;
+  // выбранный уровень фильтра (-1 = все)
+  filterLevel: number;
+  // позиция прокрутки
+  scrollPosition: number;
+};
+
 export type TreeDocument = {
   id: string;
   title: string;
