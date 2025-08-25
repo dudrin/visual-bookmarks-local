@@ -1,65 +1,174 @@
-Часть I. Введение
-________________________________________
-Глава 1. Зачем нужны браузерные расширения
-Современный браузер — это уже не просто «окошко для сайтов». В нём есть встроенный движок рендеринга страниц, менеджер вкладок, хранилище данных, инструменты безопасности. Но у каждого пользователя свои привычки и задачи. Кто-то работает с сотней вкладок, кто-то делает закладки по темам, а кто-то хочет отслеживать курсы валют прямо в панели браузера.
-Браузерное расширение — это маленькая программа, которая «живёт внутри браузера» и добавляет новые функции.
-Например:
-•	блокировщики рекламы (AdBlock, uBlock)
-•	менеджеры паролей (LastPass, Bitwarden)
-•	переводчики страниц (Google Translate)
-•	и… менеджеры закладок, как наш Visual Bookmarks
-Именно расширения делают браузер «своим». В отличие от обычных сайтов, они имеют доступ к внутреннему API браузера:
-•	могут читать список вкладок (chrome.tabs)
-•	создавать собственные меню (chrome.contextMenus)
-•	сохранять данные (chrome.storage)
-•	общаться между фоновым скриптом и интерфейсом (chrome.runtime.sendMessage)
-По сути, расширение — это мини-приложение внутри браузера, и оно подчиняется особым правилам (например, строгое разграничение прав доступа).
-________________________________________
-Глава 2. Как работает движок Chrome и почему он поддерживает расширения
-Чтобы понять, как работает расширение, полезно взглянуть на устройство браузера Chrome.
-Упрощённо его можно представить так:
-1.	Движок рендеринга (Blink)
-Отвечает за то, чтобы HTML+CSS+JS превращались в страницу на экране.
-2.	JavaScript-движок (V8)
-Выполняет JavaScript-код сайтов. Это же сердце Node.js (мы к нему ещё вернёмся).
-3.	Менеджер процессов
-Chrome запускает каждый сайт в отдельном «процессе», как маленькое приложение. Это повышает стабильность (если один сайт «упал» — браузер не рушится целиком).
-4.	Система расширений
-Встроенный модуль, который позволяет загружать «пакет» (файлы расширения) и подключать их к браузеру.
-Расширение описывается файлом manifest.json, где указано:
-o	какие права нужны (tabs, storage, contextMenus)
-o	какие скрипты запускать (фоновые, контентные, интерфейс)
-o	какие страницы/панели у него есть
-🔑 Важно: расширение работает в трёх средах одновременно:
-•	background (фоновый скрипт, мозг)
-•	UI (интерфейс, обычно React-панель)
-•	browser APIs (интерфейсы Chrome для управления вкладками, меню, хранилищем)
-Наш проект «Visual Bookmarks» как раз сочетает всё это: у него есть и фон, и интерфейс-панель, и доступ к API вкладок.
-________________________________________
-Глава 3. Наш проект Visual Bookmarks: идея и назначение
-Теперь посмотрим, зачем мы вообще делали это расширение.
-Обычные закладки в Chrome — это линейный список. Да, есть папки, но при большом количестве вкладок этим неудобно пользоваться.
-Visual Bookmarks решает несколько задач:
-•	Позволяет структурировать вкладки в дерево (например, «Работа → Проект А → Документация»).
-•	Даёт возможность добавлять выделенные вкладки сразу пачкой (а не по одной).
-•	Работает с группами вкладок Chrome, чтобы сохранять их структуру.
-•	Имеет собственный интерфейс (React-панель), где можно:
-o	перемещать узлы дерева
-o	искать закладки
-o	сохранять их офлайн
-Технически это расширение состоит из нескольких основных частей:
-1.	background.ts — фоновый скрипт: слушает клики меню, общается с API браузера, передаёт данные в интерфейс.
-2.	App.tsx — интерфейс-панель (React). Здесь всё красивое и наглядное.
-3.	tree.tsx — визуальное дерево закладок.
-4.	sqlStorage.ts — хранение закладок в локальной базе.
-5.	search.ts — поиск по закладкам.
-Если сравнить с человеческим телом:
-•	background.ts — мозг,
-•	App.tsx — глаза и руки,
-•	tree.tsx — скелет,
-•	sqlStorage.ts — память.
-________________________________________
-На этом Часть I (Введение) завершена.
+# Visual Bookmarks Tree (Local)
+
+[![Version](https://img.shields.io/badge/version-0.1.5.0-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
+
+A powerful Chrome extension for managing bookmarks in a visual tree structure with local SQLite storage and offline page saving capabilities.
+
+## 🌟 Features
+
+- **Tree Structure**: Organize bookmarks in hierarchical trees instead of flat lists
+- **Multiple Trees**: Create and manage multiple bookmark trees for different projects
+- **Local Storage**: SQLite database with WebAssembly for reliable local storage
+- **Offline Saving**: Save web pages as MHTML files for offline access
+- **Search & Filter**: Advanced search and level-based filtering
+- **Tab Management**: Add single tabs or multiple selected tabs at once
+- **Persistent UI State**: Remembers expanded nodes and view state across sessions
+- **Modern UI**: Clean React-based interface with light/dark theme support
+- **Data Export/Import**: Backup and restore your bookmark trees
+
+## 🚀 Installation
+
+### From Source
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/your-username/visual-bookmarks-local.git
+   cd visual-bookmarks-local/extension
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Build the extension**:
+   ```bash
+   npm run build
+   ```
+
+4. **Load in Chrome**:
+   - Open `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the `dist` folder
+
+### Development Mode
+
+```bash
+npm run dev
+```
+
+This starts development mode with hot reload and automatic rebuilding.
+
+## 📖 Usage
+
+### Basic Operations
+
+1. **Create a Tree**: Click the "+" button in the top bar
+2. **Add Bookmarks**: Use the right panel to add current tab or selected tabs
+3. **Organize**: Drag and drop nodes to reorganize your tree
+4. **Search**: Use the search bar to find specific bookmarks
+5. **Filter by Level**: Use level buttons to show/hide tree depths
+6. **Offline Save**: Save web pages locally with the "+ В корень (офлайн)" button
+
+### Advanced Features
+
+- **Context Menus**: Right-click on tabs to add selected tabs to your trees
+- **Panel View**: Click the "⛶" button to open a larger management window
+- **Export/Import**: Backup your data using JSON export/import
+- **Theme Switching**: Choose between light, dark, or system theme
+
+## 🛠 Technical Stack
+
+- **Frontend**: React 18.3.1 + TypeScript 5.5.4
+- **Build Tool**: Vite 5.4.2
+- **Database**: sql.js (SQLite + WebAssembly)
+- **Chrome APIs**: Manifest V3
+- **Styling**: CSS with CSS custom properties for theming
+
+## 📁 Project Structure
+
+```
+src/
+├── background.ts          # Service worker for Chrome extension
+├── models.ts             # TypeScript interfaces and types
+├── popup/               # Main popup interface
+│   ├── App.tsx          # Main React component
+│   ├── Tree.tsx         # Tree visualization component
+│   ├── useTreeStates.ts # State management hook
+│   ├── popup.html       # Popup HTML template
+│   └── popup.css        # Styling
+├── panel/               # Large panel interface
+└── shims/               # Browser compatibility shims
+```
+
+## 🔧 Development
+
+### Prerequisites
+
+- Node.js 16+ 
+- npm or yarn
+- Chrome/Chromium browser
+
+### Available Scripts
+
+- `npm run dev` - Start development with hot reload
+- `npm run build` - Build production version
+- `npm run pack` - Create distributable ZIP file
+- `npm run copy-wasm` - Copy WebAssembly files
+
+### Key Components
+
+1. **Background Script** (`background.ts`): Handles Chrome API interactions
+2. **Main App** (`App.tsx`): Core React application with tree management
+3. **Tree Component** (`Tree.tsx`): Visual tree representation with drag-and-drop
+4. **SQL Storage** (`sqlStorage.ts`): Database operations and state management
+5. **State Management** (`useTreeStates.ts`): Persistent UI state across sessions
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+## 📋 Changelog
+
+### v0.1.5.0
+- Fixed tree node expansion conflicts with level filters
+- Improved topbar layout with proper flexbox positioning
+- Added persistent UI state management across tree switching
+- Enhanced state persistence for expanded nodes and scroll position
+
+### v0.1.4.x
+- Initial implementation with React + TypeScript
+- SQLite local storage integration
+- Basic tree management functionality
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [React](https://reactjs.org/)
+- Powered by [sql.js](https://sql.js.org/) for local SQLite storage
+- Uses [Vite](https://vitejs.dev/) for fast development and building
+- Icons and design inspired by modern browser UX patterns
+
+## 📞 Support
+
+If you encounter any issues or have questions:
+
+1. Check the [Issues](https://github.com/your-username/visual-bookmarks-local/issues) page
+2. Create a new issue with detailed description
+3. Include browser version and extension version in bug reports
+
+---
+
+**Made with ❤️ for better bookmark management**
+
+---
+
+## Техническая документация (Russian Technical Guide)
+
+Подробное техническое руководство доступно в файле [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+Подробное техническое руководство доступно в файле [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
 Мы разобрались:
 •	что такое расширение,
 •	как устроен движок Chrome,
