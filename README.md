@@ -1,6 +1,6 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.5.0-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.5.1-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
@@ -13,7 +13,9 @@ A powerful Chrome extension for managing bookmarks in a visual tree structure wi
 - **Local Storage**: SQLite database with WebAssembly for reliable local storage
 - **Offline Saving**: Save web pages as MHTML files for offline access
 - **Search & Filter**: Advanced search and level-based filtering
-- **Tab Management**: Add single tabs or multiple selected tabs at once
+- **Tab Management**: Add single tabs or multiple selected tabs at once via context menu
+- **Smart Tab Grouping**: Automatically places new tabs in appropriate tab groups with fallback priority
+- **Level-Based Filtering**: Use level buttons (0, 1, 2, "All") to control tree display depth
 - **Persistent UI State**: Remembers expanded nodes and view state across sessions
 - **Modern UI**: Clean React-based interface with light/dark theme support
 - **Data Export/Import**: Backup and restore your bookmark trees
@@ -57,11 +59,15 @@ This starts development mode with hot reload and automatic rebuilding.
 ### Basic Operations
 
 1. **Create a Tree**: Click the "+" button in the top bar
-2. **Add Bookmarks**: Use the right panel to add current tab or selected tabs
-3. **Organize**: Drag and drop nodes to reorganize your tree
-4. **Search**: Use the search bar to find specific bookmarks
-5. **Filter by Level**: Use level buttons to show/hide tree depths
-6. **Offline Save**: Save web pages locally with the "+ В корень (офлайн)" button
+2. **Add Single Bookmark**: Use the right panel to add current tab
+3. **Add Multiple Bookmarks**: 
+   - Select multiple tabs in browser (Ctrl+click)
+   - Right-click and choose "Add selected tabs to Visual Bookmarks"
+   - Click the tree addition button in the extension
+4. **Organize**: Drag and drop nodes to reorganize your tree
+5. **Search**: Use the search bar to find specific bookmarks
+6. **Filter by Level**: Use level buttons (0, 1, 2, "All") to control tree depth display
+7. **Offline Save**: Save web pages locally with the "+ В корень (офлайн)" button
 
 ### Advanced Features
 
@@ -126,6 +132,14 @@ src/
 5. Open a Pull Request
 
 ## 📋 Changelog
+
+### v0.1.5.1 (Latest)
+- **Fixed level filtering functionality**: Restored tree level buttons (0, 1, 2, "All") with proper state management
+- **Improved tab group context awareness**: New tabs now open in correct tab groups using priority-based resolution
+- **Fixed context menu duplicate errors**: Resolved "Cannot create item with duplicate id" crashes during extension reloads
+- **Enhanced multi-tab selection**: Improved reliability using context menu staging over direct Chrome APIs
+- **Better user experience**: Added detailed instructions for multi-tab workflows and clearer UI feedback
+- **Technical improvements**: Enhanced error handling, code organization, and session storage management
 
 ### v0.1.5.0
 - Fixed tree node expansion conflicts with level filters
