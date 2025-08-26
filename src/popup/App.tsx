@@ -151,9 +151,9 @@ export default function App() {
   useEffect(() => {
     if (!isPanel) return;
 
-    chrome.storage.session.get(["vb_lastActiveTabId"], (res) => {
+    chrome.storage.session.get(["vb_lastActiveTabId", "vb_lastActiveGroupId"], (res) => {
       const prefer = (res && (res as any).vb_lastActiveTabId) || null;
-      if (prefer) chrome.storage.session.remove("vb_lastActiveTabId");
+      if (prefer) chrome.storage.session.remove(["vb_lastActiveTabId", "vb_lastActiveGroupId"]);
       refreshTabsAndSelect(prefer);
     });
 

@@ -69,14 +69,19 @@ async function openOrFocusUrl(url: string, docTitle: string) {
     return
   }
 
-  // 2) Создать в текущем окне и попытаться поместить в группу
+  // 2) Получаем информацию о "родительской" вкладке и группе
+  const sessionData = await chrome.storage.session.get(['vb_lastActiveTabId', 'vb_lastActiveGroupId']);
+  const parentTabId = sessionData.vb_lastActiveTabId;
+  const parentGroupId = sessionData.vb_lastActiveGroupId;
+
   const [activeWinTab] = await pTabsQuery({ active: true, currentWindow: true })
   const winId = activeWinTab?.windowId ?? (await pTabsQuery({ currentWindow: true }))[0]?.windowId
   const created = await pTabsCreate({ url: target, active: true, windowId: winId })
 
   if (!chrome.tabGroups || typeof created.id !== 'number') return
 
-  // Группа с названием дерева?
+  // 3) Приоритеты для выбора группы:
+  // а) Группа с названием дерева
   const tabsInWindow = await pTabsQuery({ windowId: created.windowId })
   const uniqueGroupIds = Array.from(new Set(
     tabsInWindow.map(t => (typeof t.groupId === 'number' ? t.groupId : -1)).filter(gid => gid >= 0)
@@ -90,10 +95,24 @@ async function openOrFocusUrl(url: string, docTitle: string) {
   }
   if (targetGroupId !== null) { await pTabsGroup({ tabIds: created.id, groupId: targetGroupId }); return }
 
+  // б) Группа "родительской" вкладки
+  if (typeof parentGroupId === 'number' && parentGroupId >= 0) {
+    try {
+      // Проверяем, что группа существует в том же окне
+      const groupStillExists = uniqueGroupIds.includes(parentGroupId);
+      if (groupStillExists) {
+        await pTabsGroup({ tabIds: created.id, groupId: parentGroupId });
+        return;
+      }
+    } catch {}
+  }
+
+  // в) Группа текущей активной вкладки (запасной вариант)
   const activeGroupId = (activeWinTab && typeof activeWinTab.groupId === 'number' && activeWinTab.groupId >= 0)
     ? activeWinTab.groupId : -1
   if (activeGroupId >= 0) { await pTabsGroup({ tabIds: created.id, groupId: activeGroupId }); return }
 
+  // г) Создаём новую группу с названием дерева
   try {
     const newGroupId = await pTabsGroup({ tabIds: created.id })
     await pTabGroupsUpdate(newGroupId, { title: docTitle })
@@ -111,10 +130,6 @@ const toNode = (t: chrome.tabs.Tab): TreeNode => ({
   children: []
 })
 
-async function getHighlightedTabs(): Promise<chrome.tabs.Tab[]> {
-  const ts = await pTabsQuery({ currentWindow: true, highlighted: true })
-  return ts.filter(isNormalTab)
-}
 
 /* ------------------- UI helpers ------------------- */
 
@@ -196,14 +211,39 @@ const NodeView: React.FC<{
   const addSelectedTabHere = async (e?:React.MouseEvent) => {
     e?.stopPropagation()
     if (isLink) return
-    const highlighted = await getHighlightedTabs()
-    if (highlighted.length) {
-      let next = allNodes
-      for (let i = highlighted.length - 1; i >= 0; i--) next = insertChild(next, node.id, toNode(highlighted[i]))
-      await saveNodes(next)
-      return
+    
+    // Сначала проверяем, есть ли буферизованные вкладки из контекстного меню
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'VB_POP_STAGED_TABS' });
+      
+      if (response?.ok && Array.isArray(response.tabs) && response.tabs.length > 0) {
+        // Преобразуем staged tabs в узлы
+        const newNodes = response.tabs.map((tab: { title: string; url: string }) => ({
+          id: crypto.randomUUID(),
+          title: tab.title || tab.url,
+          url: tab.url,
+          children: []
+        }));
+        
+        // Вставляем все узлы
+        let next = allNodes
+        for (const newNode of newNodes) {
+          next = insertChild(next, node.id, newNode)
+        }
+        await saveNodes(next)
+        return
+      }
+    } catch (error) {
+      console.error('Error getting staged tabs:', error);
     }
-    if (!selectedTab) { alert('Выделите вкладки в браузере или выберите вкладку справа'); return }
+    
+    // Если нет буферизованных вкладок, используем selectedTab или показываем инструкцию
+    if (!selectedTab) { 
+      alert('Для добавления нескольких вкладок:\n\n1. Выделите вкладки в браузере (Ctrl+клик)\n2. Нажмите ПКМ на странице\n3. Выберите "Добавить выделенные вкладки в Visual Bookmarks"\n4. Затем нажмите эту кнопку\n\nИли выберите одну вкладку справа для добавления.'); 
+      return 
+    }
+    
+    // Добавляем выбранную вкладку
     await saveNodes(insertChild(allNodes, node.id, {
       id: crypto.randomUUID(),
       title: selectedTab.title || selectedTab.url,
@@ -282,7 +322,7 @@ const NodeView: React.FC<{
         <div className="node-actions">
           {isLink && <button className="icon-btn" title="Перейти/открыть" onClick={openHere}>↗</button>}
           {!isLink && <button className="icon-btn" title="Добавить категорию" onClick={addCategoryHere}>📁＋</button>}
-          {!isLink && <button className="icon-btn" title="Добавить выделенные вкладки" onClick={addSelectedTabHere}>🔗⇧</button>}
+          {!isLink && <button className="icon-btn" title="Добавить выделенные вкладки (используйте ПКМ → 'Добавить выделенные вкладки')" onClick={addSelectedTabHere}>🔗⇧</button>}
           <button className="icon-btn" title="Переименовать" onClick={renameHere}>✏️</button>
           <button className="icon-btn" title="Удалить" onClick={deleteHere}>🗑️</button>
         </div>
@@ -341,7 +381,12 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
   }
   
   const handleLevelChange = (newLevel: number) => {
-    onUpdateUIState(prev => ({ ...prev, filterLevel: newLevel }))
+    onUpdateUIState(prev => ({ 
+      ...prev, 
+      filterLevel: newLevel,
+      // Сбрасываем явные состояния раскрытия при смене уровня
+      expandedNodes: new Set<string>()
+    }))
   }
   
   const handleToggleExpanded = (nodeId: string, isExpanded: boolean) => {
@@ -383,26 +428,15 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
 
   // глубина
   const maxDepth = useMemo(() => Math.max(0, computeMaxDepth(allNodes) - 1), [allNodes])
-  // Убираем физическое обрезание дерева - теперь level влияет только на начальное раскрытие
+  
+  // не обрезаем дерево физически - level влияет только на начальное раскрытие в NodeView
   const shown = searched
 
-  // Добавление выделенных вкладок в КОРЕНЬ
-  const addHighlightedToRoot = async () => {
-    const tabs = await getHighlightedTabs()
-    if (!tabs.length) {
-      if (!selectedTab) { alert('Выделите вкладки в браузере или выберите вкладку справа'); return }
-      setAllNodesDirty([{ id: crypto.randomUUID(), title: selectedTab.title || selectedTab.url, url: selectedTab.url, children: [] }, ...allNodes])
-      return
-    }
-    const batch = tabs.map(toNode)
-    setAllNodesDirty([...batch, ...allNodes])
-  }
   return (
     <div className="tree" role="tree">
       <div className="tree-actions">
         <button onClick={onAddRootCategory}>+ Категория (в корень)</button>
         <button onClick={onAddCurrentTabToRoot}>+ Текущая вкладка (в корень)</button>
-        <button onClick={addHighlightedToRoot}>+ Выделенные (в корень)</button>
 
         {/* Фильтр уровней — ТОЛЬКО КЛИК, без hover */}
         <div className="levelbar" aria-label="Фильтр по уровню">

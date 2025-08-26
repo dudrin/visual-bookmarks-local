@@ -80,7 +80,12 @@ function isNormalTab(t?: chrome.tabs.Tab | null) {
 async function rememberCurrentAsLastActive() {
   const [active] = await pTabsQuery({ active: true, currentWindow: true });
   if (isNormalTab(active)) {
-    await chrome.storage.session.set({ vb_lastActiveTabId: active!.id });
+    const sessionData: any = { vb_lastActiveTabId: active!.id };
+    // Сохраняем также группу вкладки для правильного размещения новых вкладок
+    if (chrome.tabGroups && typeof active!.groupId === 'number' && active!.groupId >= 0) {
+      sessionData.vb_lastActiveGroupId = active!.groupId;
+    }
+    await chrome.storage.session.set(sessionData);
   }
 }
 
@@ -151,6 +156,26 @@ function ensureSelectedTabsMenu() {
     /* ignore dups */
   }
 }
+
+function ensureCurrentTabMenu() {
+  try {
+    chrome.contextMenus.create({
+      id: "vb-add-current-tab",
+      title: "Добавить текущую вкладку в Visual Bookmarks",
+      contexts: ["page"],
+    });
+  } catch {
+    /* ignore dups */
+  }
+}
+
+function setupContextMenus() {
+  // Очищаем все существующие элементы меню перед созданием новых
+  chrome.contextMenus.removeAll(() => {
+    ensureSelectedTabsMenu();
+    ensureCurrentTabMenu();
+  });
+}
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     if (info.menuItemId === "vb-add-selected-tabs") {
@@ -179,16 +204,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 /* ---------- Жизненный цикл ---------- */
 chrome.runtime.onInstalled.addListener(() => {
   chrome.action.setPopup({ popup: "" });
-  ensureSelectedTabsMenu();
-  chrome.contextMenus.create({
-    id: "vb-add-current-tab",
-    title: "Добавить текущую вкладку в Visual Bookmarks",
-    contexts: ["page"],
-  });
+  setupContextMenus();
 });
 chrome.runtime.onStartup.addListener(() => {
   chrome.action.setPopup({ popup: "" });
-  ensureSelectedTabsMenu();
+  setupContextMenus();
 });
 
 if (chrome.action.onClicked) {
@@ -207,6 +227,7 @@ chrome.runtime.onMessage.addListener((msg: any, _sender, sendResponse) => {
       sendResponse({ ok: true, tabs: out });
       return;
     }
+
 
     // ====== офлайн MHTML ======
     if (msg?.type === "SAVE_OFFLINE_FOR_URL") {
