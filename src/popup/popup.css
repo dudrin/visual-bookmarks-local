@@ -50,6 +50,11 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
 .node-row[aria-expanded='false'] + .children{opacity:0;transform:translateY(-4px)}
 .dot{width:8px;height:8px;border-radius:50%}
 .dot.folder{background:#888}.dot.link{background:var(--accent)}
+/* Новый стиль для ссылок с дочерними элементами */
+.dot.link-parent {
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
 .node-actions{margin-left:auto;display:flex;gap:6px}
 .icon-btn { background:transparent; border:none; cursor:pointer; }
 .favicon{width:16px;height:16px;border-radius:3px;flex:0 0 16px}

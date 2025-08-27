@@ -237,7 +237,7 @@ const NodeView: React.FC<{
 
   const addSelectedTabHere = async (e?: React.MouseEvent) => {
     e?.stopPropagation()
-    if (isLink) return
+    // Убираем проверку isLink, чтобы разрешить добавление в ссылки
     
     try {
       // Получаем выделенные закладки для проверки
@@ -413,7 +413,7 @@ const NodeView: React.FC<{
       // В режиме выделения - переключаем выделение
       e.stopPropagation()
       onToggleNodeSelection(node)
-    } else if (!isLink) {
+    } else if (!isLink || hasChildren) {
       // Обычный режим - управление раскрытием
       // При клике помечаем узел как явно управляемый пользователем
       if (isExpanded) {
@@ -425,7 +425,24 @@ const NodeView: React.FC<{
         onToggleExpanded(node.id, true)
         onToggleExpanded(`closed:${node.id}`, false)
       }
+    } else if (isLink && !hasChildren) {
+      // Открываем ссылку только если у нее нет дочерних элементов
+      openHere(e as any)
     }
+  }
+
+  // Определяем класс для точки узла
+  const getDotClass = () => {
+    if (isLink) {
+      // Ссылка с дочерними элементами
+      if (hasChildren) {
+        return 'link-parent'
+      }
+      // Обычная ссылка
+      return 'link'
+    }
+    // Папка
+    return 'folder'
   }
 
   return (
@@ -433,7 +450,7 @@ const NodeView: React.FC<{
       <div
         className={`node-row ${isSelected ? 'selected' : ''}`}
         role="treeitem"
-        aria-expanded={!isLink ? effectiveOpen : undefined}
+        aria-expanded={(!isLink || hasChildren) ? effectiveOpen : undefined}
         tabIndex={-1}
         data-node-id={node.id}
         onClick={handleRowClick}
@@ -447,7 +464,7 @@ const NodeView: React.FC<{
             }}
           />
         )}
-        <span className={'dot ' + (isLink ? 'link' : 'folder')} title={effectiveOpen ? 'Свернуть' : 'Развернуть'} />
+        <span className={'dot ' + getDotClass()} title={effectiveOpen ? 'Свернуть' : 'Развернуть'} />
         {isLink ? (
           <span className="link-wrap">
             {(() => {
@@ -464,9 +481,12 @@ const NodeView: React.FC<{
           <span className="node-title"><TitleWithHighlight text={node.title} q={q} /></span>
         )}
         <div className="node-actions">
+          {/* Всегда показываем кнопку открытия для ссылок */}
           {isLink && <button className="icon-btn" title="Перейти/открыть" onClick={openHere}>↗</button>}
-          {!isLink && <button className="icon-btn" title="Добавить категорию" onClick={addCategoryHere}>📁＋</button>}
-          {!isLink && <button className="icon-btn" title="Добавить выделенные вкладки (используйте ПКМ → 'Добавить выделенные вкладки')" onClick={addSelectedTabHere}>🔗⇧</button>}
+          {/* Всегда показываем кнопку добавления категории */}
+          <button className="icon-btn" title="Добавить категорию" onClick={addCategoryHere}>📁＋</button>
+          {/* Всегда показываем кнопку добавления выделенных вкладок */}
+          <button className="icon-btn" title="Добавить выделенные вкладки (используйте ПКМ → 'Добавить выделенные вкладки')" onClick={addSelectedTabHere}>🔗⇧</button>
           <button className="icon-btn" title="Переименовать" onClick={renameHere}>✏️</button>
           <button className="icon-btn" title="Удалить" onClick={deleteHere}>🗑️</button>
         </div>
