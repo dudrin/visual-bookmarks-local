@@ -100,3 +100,269 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
   background: color-mix(in oklab, var(--accent) 18%, transparent);
   border-color: var(--accent);
 }
+
+/* ===== СТИЛИ ДЛЯ СИСТЕМЫ ВЫДЕЛЕНИЯ ===== */
+
+/* Индикатор выделения */
+.selection-indicator {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  margin: 0 -8px 8px -8px; /* растягиваем на всю ширину */
+}
+
+.selection-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.selection-mode-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.selection-mode-btn:hover {
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+}
+
+.selection-mode-btn.active {
+  background: color-mix(in oklab, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.selection-icon {
+  font-size: 14px;
+}
+
+.selection-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.count-badge {
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.count-text {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.clear-selection-btn {
+  padding: 4px 8px;
+  border: 1px solid #dc3545;
+  border-radius: 6px;
+  background: transparent;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.clear-selection-btn:hover {
+  background: #dc3545;
+  color: white;
+}
+
+/* Group operations styling */
+.group-operations {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-operation-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.group-operation-btn.delete-btn {
+  background: #ff4757;
+  color: white;
+}
+
+.group-operation-btn.delete-btn:hover {
+  background: #ff3838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+}
+
+.group-operation-btn.move-btn {
+  background: #3742fa;
+  color: white;
+}
+
+.group-operation-btn.move-btn:hover {
+  background: #2f3542;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(55, 66, 250, 0.3);
+}
+
+.group-operation-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark theme adjustments for group operations */
+[data-theme='dark'] .group-operation-btn.delete-btn {
+  background: #e74c3c;
+}
+
+[data-theme='dark'] .group-operation-btn.delete-btn:hover {
+  background: #c0392b;
+}
+
+[data-theme='dark'] .group-operation-btn.move-btn {
+  background: #3498db;
+}
+
+[data-theme='dark'] .group-operation-btn.move-btn:hover {
+  background: #2980b9;
+}
+
+/* Styling for the universal selected-to-root button */
+.selected-to-root-btn {
+  background: #17a2b8 !important;
+  color: white !important;
+  border: none !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.selected-to-root-btn:hover {
+  background: #138496 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
+}
+
+.selected-to-root-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark theme adjustments for selected-to-root button */
+[data-theme='dark'] .selected-to-root-btn {
+  background: #20c997 !important;
+}
+
+[data-theme='dark'] .selected-to-root-btn:hover {
+  background: #1aa179 !important;
+}
+
+.selection-hint {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: color-mix(in oklab, var(--muted) 10%, transparent);
+  border-radius: 6px;
+  border-left: 3px solid var(--muted);
+}
+
+.hint-text {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Стили для выделенных узлов */
+.node-row.selected {
+  background: color-mix(in oklab, var(--accent) 20%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.node-row.selected .node-title,
+.node-row.selected .link-text {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.node-row.selected .dot {
+  border: 2px solid var(--accent);
+  background: var(--bg);
+}
+
+/* Checkbox для выделения в режиме выделения */
+.selection-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  margin-right: 4px;
+}
+
+.selection-checkbox:hover {
+  border-color: var(--accent);
+}
+
+.selection-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.selection-checkbox.checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Анимация для режима выделения */
+.tree.selection-mode .node-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tree.selection-mode .node-row:hover {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  transform: translateX(2px);
+}

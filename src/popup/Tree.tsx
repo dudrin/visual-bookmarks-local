@@ -1,8 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react'
 import type { TreeDocument, TreeNode, TreeUIState } from '../models'
 import { filterTree, highlight } from '../search'
-import { insertChild, removeNode, updateNode, moveNode } from '../treeOps'
-import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадут onCommitNodes
+import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes } from '../treeOps'
+import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
+import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
 type Props = {
   doc: TreeDocument
   onAddRootCategory: () => void
@@ -14,6 +15,19 @@ type Props = {
   // Состояние UI дерева
   uiState: TreeUIState
   onUpdateUIState: (updater: (prev: TreeUIState) => TreeUIState) => void
+  // Новые пропсы для системы выделения
+  selectionMode?: boolean
+  moveMode?: boolean
+  isNodeSelected?: (nodeId: string) => boolean
+  onToggleNodeSelection?: (node: TreeNode) => void
+  // Групповые операции
+  onDeleteSelected?: () => void
+  removeNodesFromSelection?: (treeId: string, nodeIds: string[]) => void
+  // Данные всех деревьев для поддержки межпроектных переносов
+  allTrees?: TreeDocument[]
+  onUpdateTreeNodes?: (treeId: string, nodes: TreeNode[]) => Promise<void>
+  // Глобальные функции выделения для междеревных операций
+  globalIsNodeSelected?: (treeId: string, nodeId: string) => boolean
 }
 
 /* ---------- helpers для Chrome API (Promise-обёртки) ---------- */
@@ -178,7 +192,20 @@ const NodeView: React.FC<{
   maxLevel?: number
   expandedNodes: Set<string>
   onToggleExpanded: (nodeId: string, isExpanded: boolean) => void
-}> = ({ node, q, allNodes, setAllNodes, docId, docTitle, forceExpand, selectedTab, depth = 0, maxLevel = -1, expandedNodes, onToggleExpanded }) => {
+  // Новые пропсы для системы выделения
+  selectionMode?: boolean
+  moveMode?: boolean
+  isNodeSelected?: (nodeId: string) => boolean
+  onToggleNodeSelection?: (node: TreeNode) => void
+  removeNodesFromSelection?: (treeId: string, nodeIds: string[]) => void
+  // Параметры для универсального переноса
+  allTrees?: TreeDocument[]
+  onUpdateTreeNodes?: (treeId: string, nodes: TreeNode[]) => Promise<void>
+  globalIsNodeSelected?: (treeId: string, nodeId: string) => boolean
+}> = ({ node, q, allNodes, setAllNodes, docId, docTitle, forceExpand, selectedTab, depth = 0, maxLevel = -1, expandedNodes, onToggleExpanded, selectionMode = false, moveMode = false, isNodeSelected, onToggleNodeSelection, removeNodesFromSelection, allTrees = [], onUpdateTreeNodes, globalIsNodeSelected }) => {
+  // Определяем состояние выделения для этого узла
+  const isSelected = isNodeSelected ? isNodeSelected(node.id) : false
+  
   // Определяем начальное состояние раскрытия на основе фильтра уровней
   const shouldBeOpenByLevel = maxLevel < 0 || depth < maxLevel
   
@@ -208,48 +235,149 @@ const NodeView: React.FC<{
     await saveNodes(insertChild(allNodes, node.id, { id: crypto.randomUUID(), title: name, children: [] }))
   }
 
-  const addSelectedTabHere = async (e?:React.MouseEvent) => {
+  const addSelectedTabHere = async (e?: React.MouseEvent) => {
     e?.stopPropagation()
     if (isLink) return
     
-    // Сначала проверяем, есть ли буферизованные вкладки из контекстного меню
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'VB_POP_STAGED_TABS' });
+      // Получаем выделенные закладки для проверки
+      let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
       
-      if (response?.ok && Array.isArray(response.tabs) && response.tabs.length > 0) {
-        // Преобразуем staged tabs в узлы
-        const newNodes = response.tabs.map((tab: { title: string; url: string }) => ({
-          id: crypto.randomUUID(),
-          title: tab.title || tab.url,
-          url: tab.url,
-          children: []
-        }));
+      if (selectionMode && globalIsNodeSelected) {
+        // Получаем выделенные узлы (ссылки и папки)
+        const collectSelected = (trees: TreeDocument[]) => {
+          const result: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
+          
+          trees.forEach(tree => {
+            const findSelectedNodes = (nodes: TreeNode[]): void => {
+              nodes.forEach(n => {
+                if (globalIsNodeSelected(tree.id, n.id)) {
+                  result.push({
+                    treeId: tree.id,
+                    nodeId: n.id,
+                    title: n.title,
+                    url: n.url
+                  })
+                }
+                if (n.children) {
+                  findSelectedNodes(n.children)
+                }
+              })
+            }
+            findSelectedNodes(tree.nodes)
+          })
+          
+          return result
+        }
         
-        // Вставляем все узлы
+        selectedNodes = collectSelected(allTrees)
+      }
+      
+      console.log('[DEBUG] addSelectedTabHere:', {
+        selectionMode,
+        allTreesCount: allTrees.length,
+        selectedNodesCount: selectedNodes.length,
+        selectedNodes: selectedNodes.map(n => `${n.treeId}:${n.nodeId} (${n.title})`),
+        targetNodeId: node.id,
+        targetTreeId: docId
+      })
+      
+      // Получаем элементы для добавления по приоритету
+      const itemsToAdd = await getUniversalItemsToAdd({
+        selectedNodes,
+        selectedTab,
+        sourceTreeData: allTrees.map(t => ({ treeId: t.id, nodes: t.nodes }))
+      })
+      
+      console.log('[DEBUG] itemsToAdd:', {
+        count: itemsToAdd.length,
+        source: itemsToAdd[0]?.source,
+        items: itemsToAdd.map(item => ({ id: item.id, title: item.title, source: item.source }))
+      })
+
+      if (itemsToAdd.length === 0) {
+        alert('Нет элементов для добавления.\n\n' +
+              'Для добавления вкладок:\n' +
+              '1. Выделите вкладки в браузере (Ctrl+клик)\n' +
+              '2. Нажмите ПКМ на странице\n' +
+              '3. Выберите "Добавить выделенные вкладки в Visual Bookmarks"\n' +
+              '4. Затем нажмите эту кнопку\n\n' +
+              'Для перемещения закладок:\n' +
+              '1. Включите режим выделения\n' +
+              '2. Выделите нужные закладки\n' +
+              '3. Нажмите на иконку 🔗⇧ в нужной папке\n\n' +
+              'Или выберите одну вкладку справа для добавления.')
+        return
+      }
+      
+      // Определяем источник для обработки
+      const source = itemsToAdd[0].source
+      
+      if (source === 'selection') {
+        // Используем простое копирование (аналогично staged tabs)
+        try {
+          const copiedNodes = await copySelectedNodes({
+            selectedNodes,
+            sourceTreeData: allTrees.map(t => ({ treeId: t.id, nodes: t.nodes })),
+            moveMode,
+            onUpdateTree: onUpdateTreeNodes,
+            targetTreeId: docId // Для определения внутридерева перемещений
+          })
+          
+          console.log('[DEBUG] Got copied nodes:', copiedNodes.length)
+          
+          if (copiedNodes.length > 0) {
+            // Добавляем скопированные узлы в целевую папку
+            let next = allNodes
+            for (const copiedNode of copiedNodes) {
+              next = insertChild(next, node.id, copiedNode)
+            }
+            await saveNodes(next)
+            
+            // Для внутридерева перемещений - удаляем исходные узлы ПОСЛЕ вставки
+            if (moveMode && onUpdateTreeNodes) {
+              await deleteSourceNodesForIntraTreeMove({
+                selectedNodes: selectedNodes.map(n => ({ treeId: n.treeId, nodeId: n.nodeId })),
+                treeId: docId,
+                currentTreeNodes: next,
+                onUpdateTree: (treeId, newNodes) => {
+                  setAllNodes(newNodes)
+                  return Promise.resolve()
+                }
+              })
+            }
+            
+            // Очищаем выделение после копирования/перемещения
+            if (removeNodesFromSelection) {
+              selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
+            }
+            
+            console.log(`Успешно ${moveMode ? 'перемещено' : 'скопировано'} ${copiedNodes.length} элементов`)
+          } else {
+            alert('Не удалось скопировать выделенные элементы')
+          }
+        } catch (error) {
+          console.error('Error copying nodes:', error)
+          alert('Ошибка при копировании: ' + (error as Error).message)
+        }
+      } else {
+        // Добавляем новые узлы
         let next = allNodes
-        for (const newNode of newNodes) {
+        for (const item of itemsToAdd) {
+          const newNode = universalItemToTreeNode(item)
           next = insertChild(next, node.id, newNode)
         }
         await saveNodes(next)
-        return
       }
+      
+      // Показываем уведомление о результате
+      const description = getSourceDescription(source, itemsToAdd.length)
+      console.log(`Успешно ${source === 'selection' ? (moveMode ? 'перемещено' : 'скопировано') : 'добавлено'}: ${description}`)
+      
     } catch (error) {
-      console.error('Error getting staged tabs:', error);
+      console.error('Error in addSelectedTabHere:', error)
+      alert('Ошибка при добавлении элементов: ' + (error as Error).message)
     }
-    
-    // Если нет буферизованных вкладок, используем selectedTab или показываем инструкцию
-    if (!selectedTab) { 
-      alert('Для добавления нескольких вкладок:\n\n1. Выделите вкладки в браузере (Ctrl+клик)\n2. Нажмите ПКМ на странице\n3. Выберите "Добавить выделенные вкладки в Visual Bookmarks"\n4. Затем нажмите эту кнопку\n\nИли выберите одну вкладку справа для добавления.'); 
-      return 
-    }
-    
-    // Добавляем выбранную вкладку
-    await saveNodes(insertChild(allNodes, node.id, {
-      id: crypto.randomUUID(),
-      title: selectedTab.title || selectedTab.url,
-      url: selectedTab.url,
-      children: []
-    }))
   }
 
   const renameHere = async (e?:React.MouseEvent) => {
@@ -280,29 +408,45 @@ const NodeView: React.FC<{
     await openOrFocusUrl(node.url, docTitle)
   }
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    if (selectionMode && onToggleNodeSelection) {
+      // В режиме выделения - переключаем выделение
+      e.stopPropagation()
+      onToggleNodeSelection(node)
+    } else if (!isLink) {
+      // Обычный режим - управление раскрытием
+      // При клике помечаем узел как явно управляемый пользователем
+      if (isExpanded) {
+        // Сворачиваем: удаляем из expanded, добавляем в closed
+        onToggleExpanded(node.id, false)
+        onToggleExpanded(`closed:${node.id}`, true)
+      } else {
+        // Раскрываем: добавляем в expanded, удаляем из closed
+        onToggleExpanded(node.id, true)
+        onToggleExpanded(`closed:${node.id}`, false)
+      }
+    }
+  }
+
   return (
     <div className="node" draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>
       <div
-        className="node-row"
+        className={`node-row ${isSelected ? 'selected' : ''}`}
         role="treeitem"
         aria-expanded={!isLink ? effectiveOpen : undefined}
         tabIndex={-1}
         data-node-id={node.id}
-        onClick={()=>{
-          if (!isLink) {
-            // При клике помечаем узел как явно управляемый пользователем
-            if (isExpanded) {
-              // Сворачиваем: удаляем из expanded, добавляем в closed
-              onToggleExpanded(node.id, false)
-              onToggleExpanded(`closed:${node.id}`, true)
-            } else {
-              // Раскрываем: добавляем в expanded, удаляем из closed
-              onToggleExpanded(node.id, true)
-              onToggleExpanded(`closed:${node.id}`, false)
-            }
-          }
-        }}
+        onClick={handleRowClick}
       >
+        {selectionMode && (
+          <div 
+            className={`selection-checkbox ${isSelected ? 'checked' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleNodeSelection?.(node)
+            }}
+          />
+        )}
         <span className={'dot ' + (isLink ? 'link' : 'folder')} title={effectiveOpen ? 'Свернуть' : 'Развернуть'} />
         {isLink ? (
           <span className="link-wrap">
@@ -345,6 +489,14 @@ const NodeView: React.FC<{
               maxLevel={maxLevel}
               expandedNodes={expandedNodes}
               onToggleExpanded={onToggleExpanded}
+              selectionMode={selectionMode}
+              moveMode={moveMode}
+              isNodeSelected={isNodeSelected}
+              onToggleNodeSelection={onToggleNodeSelection}
+              removeNodesFromSelection={removeNodesFromSelection}
+              allTrees={allTrees}
+              onUpdateTreeNodes={onUpdateTreeNodes}
+              globalIsNodeSelected={globalIsNodeSelected}
             />
           ))}
         </div>
@@ -353,7 +505,7 @@ const NodeView: React.FC<{
   )
 }
 
-const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, forceExpand, selectedTab, onCommitNodes, uiState, onUpdateUIState }) => {
+const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, forceExpand, selectedTab, onCommitNodes, uiState, onUpdateUIState, selectionMode = false, moveMode = false, isNodeSelected, onToggleNodeSelection, onDeleteSelected, removeNodesFromSelection, allTrees = [], onUpdateTreeNodes, globalIsNodeSelected }) => {
   // Используем состояние из пропсов
   const q = uiState.searchQuery
   const level = uiState.filterLevel
@@ -374,6 +526,126 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
     dirtyRef.current = false
     setAllNodes(doc.nodes)
   }, [doc.id, doc.nodes])
+
+  // Универсальная функция для добавления выделенного (вкладки или закладки) в корень
+  const handleAddSelectedToRoot = async () => {
+    try {
+      // Получаем выделенные закладки для проверки
+      let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
+      
+      if (selectionMode && globalIsNodeSelected) {
+        // Получаем выделенные узлы (и ссылки, и папки)
+        const collectSelected = (trees: TreeDocument[]) => {
+          const result: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
+          
+          trees.forEach(tree => {
+            const findSelectedNodes = (nodes: TreeNode[]): void => {
+              nodes.forEach(n => {
+                if (globalIsNodeSelected(tree.id, n.id)) {
+                  result.push({
+                    treeId: tree.id,
+                    nodeId: n.id,
+                    title: n.title,
+                    url: n.url
+                  })
+                }
+                if (n.children) {
+                  findSelectedNodes(n.children)
+                }
+              })
+            }
+            findSelectedNodes(tree.nodes)
+          })
+          
+          return result
+        }
+        
+        selectedNodes = collectSelected(allTrees)
+      }
+      
+      // Получаем элементы для добавления по приоритету
+      const itemsToAdd = await getUniversalItemsToAdd({
+        selectedNodes,
+        selectedTab,
+        sourceTreeData: allTrees.map(t => ({ treeId: t.id, nodes: t.nodes }))
+      })
+      
+      if (itemsToAdd.length === 0) {
+        alert('Нет элементов для добавления.\n\n' +
+              'Для добавления вкладок:\n' +
+              '1. Выделите вкладки в браузере (Ctrl+клик)\n' +
+              '2. Нажмите ПКМ на странице\n' +
+              '3. Выберите "Добавить выделенные вкладки в Visual Bookmarks"\n' +
+              '4. Затем нажмите эту кнопку\n\n' +
+              'Для перемещения закладок:\n' +
+              '1. Включите режим выделения\n' +
+              '2. Выделите нужные закладки\n' +
+              '3. Нажмите эту кнопку\n\n' +
+              'Или выберите одну вкладку справа для добавления.')
+        return
+      }
+      
+      // Определяем источник для обработки
+      const source = itemsToAdd[0].source
+      
+      if (source === 'selection') {
+        // Используем простое копирование в корень
+        try {
+          const copiedNodes = await copySelectedNodes({
+            selectedNodes,
+            sourceTreeData: allTrees.map(t => ({ treeId: t.id, nodes: t.nodes })),
+            moveMode,
+            onUpdateTree: onUpdateTreeNodes,
+            targetTreeId: doc.id // Для определения внутридерева перемещений
+          })
+          
+          if (copiedNodes.length > 0) {
+            // Добавляем скопированные узлы в корень
+            const updatedNodes = [...copiedNodes, ...allNodes]
+            setAllNodesDirty(updatedNodes)
+            
+            // Для внутридерева перемещений - удаляем исходные узлы ПОСЛЕ вставки
+            if (moveMode && onUpdateTreeNodes) {
+              await deleteSourceNodesForIntraTreeMove({
+                selectedNodes: selectedNodes.map(n => ({ treeId: n.treeId, nodeId: n.nodeId })),
+                treeId: doc.id,
+                currentTreeNodes: updatedNodes,
+                onUpdateTree: (treeId, newNodes) => {
+                  setAllNodes(newNodes)
+                  return Promise.resolve()
+                }
+              })
+            }
+            
+            // Очищаем выделение
+            if (removeNodesFromSelection) {
+              selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
+            }
+            
+            console.log(`Успешно ${moveMode ? 'перемещено' : 'скопировано'} в корень: ${copiedNodes.length} элементов`)
+          } else {
+            alert('Не удалось скопировать выделенные элементы')
+          }
+        } catch (error) {
+          console.error('Error copying to root:', error)
+          alert('Ошибка при копировании: ' + (error as Error).message)
+        }
+      } else {
+        // Добавляем новые узлы в корень
+        const newNodes = itemsToAdd.map(universalItemToTreeNode)
+        const updatedNodes = [...newNodes, ...allNodes]
+        setAllNodesDirty(updatedNodes)
+      }
+      
+      // Показываем уведомление о результате
+      const description = getSourceDescription(source, itemsToAdd.length)
+      console.log(`Успешно ${source === 'selection' ? (moveMode ? 'перемещено' : 'скопировано') : 'добавлено'} в корень: ${description}`)
+      
+    } catch (error) {
+      console.error('Error in handleAddSelectedToRoot:', error)
+      alert('Ошибка при добавлении элементов: ' + (error as Error).message)
+    }
+  }
 
   // Обработчики для обновления UI состояния
   const handleSearchChange = (newQuery: string) => {
@@ -433,10 +705,17 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
   const shown = searched
 
   return (
-    <div className="tree" role="tree">
+    <div className={`tree ${selectionMode ? 'selection-mode' : ''}`} role="tree">
       <div className="tree-actions">
         <button onClick={onAddRootCategory}>+ Категория (в корень)</button>
         <button onClick={onAddCurrentTabToRoot}>+ Текущая вкладка (в корень)</button>
+        <button 
+          onClick={handleAddSelectedToRoot}
+          className="selected-to-root-btn"
+          title="Добавить выделенные вкладки или переместить выделенные закладки в корень"
+        >
+          🔗⇧ + Выделенное (в корень)
+        </button>
 
         {/* Фильтр уровней — ТОЛЬКО КЛИК, без hover */}
         <div className="levelbar" aria-label="Фильтр по уровню">
@@ -493,6 +772,14 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
             maxLevel={level}
             expandedNodes={expandedNodes}
             onToggleExpanded={handleToggleExpanded}
+            selectionMode={selectionMode}
+            moveMode={moveMode}
+            isNodeSelected={isNodeSelected}
+            onToggleNodeSelection={onToggleNodeSelection}
+            removeNodesFromSelection={removeNodesFromSelection}
+            allTrees={allTrees}
+            onUpdateTreeNodes={onUpdateTreeNodes}
+            globalIsNodeSelected={globalIsNodeSelected}
           />
         ))}
       </div>

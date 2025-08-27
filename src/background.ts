@@ -228,6 +228,16 @@ chrome.runtime.onMessage.addListener((msg: any, _sender, sendResponse) => {
       return;
     }
 
+    // Установить staged tabs (для проверки без потребления)
+    if (msg?.type === "VB_STAGE_TABS") {
+      const tabs: StagedTab[] = Array.isArray(msg.tabs) ? msg.tabs : [];
+      stagedTabs = tabs;
+      stagedExpiresAt = Date.now() + 5 * 60_000; // 5 минут
+      await chrome.storage.session.set({ vb_stagedTabs: tabs, vb_stagedExpiresAt: stagedExpiresAt });
+      sendResponse({ ok: true });
+      return;
+    }
+
 
     // ====== офлайн MHTML ======
     if (msg?.type === "SAVE_OFFLINE_FOR_URL") {

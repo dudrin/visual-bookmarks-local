@@ -21,6 +21,16 @@ export type TreeUIState = {
   scrollPosition: number;
 };
 
+// Глобальное состояние выделения элементов (персистентно между деревьями)
+export type SelectionState = {
+  // ID выделенных узлов с указанием к какому дереву они принадлежат
+  selectedNodes: Map<string, { treeId: string; nodeId: string; title: string; url?: string }>;
+  // включён ли режим выделения
+  selectionMode: boolean;
+  // режим перемещения (true) или копирования (false)
+  moveMode: boolean;
+};
+
 export type TreeDocument = {
   id: string;
   title: string;

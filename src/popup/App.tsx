@@ -16,9 +16,13 @@ import {
   getDbStatus,
   saveNow,
 } from "./sqlStorage"; // <— sqlStorage
+import { removeMultipleNodes, moveMultipleNodes } from "../treeOps"; // Для групповых операций
+import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes } from '../universalAdd';
 import "./popup.css";
 import Tree from "./Tree";
 import { useTreeStates } from "./useTreeStates";
+import { useSelection } from "./useSelection";
+import SelectionIndicator from "./SelectionIndicator";
 
 type SimpleTab = {
   id: number;
@@ -38,6 +42,20 @@ export default function App() {
 
   // Хук для управления состояниями деревьев
   const { getState, updateState, removeState } = useTreeStates();
+
+  // Хук для управления глобальным состоянием выделения
+  const {
+    selectionState,
+    toggleSelectionMode,
+    toggleMoveMode,
+    toggleNodeSelection,
+    isNodeSelected,
+    clearSelection,
+    getSelectionCount,
+    getSelectedNodeIds,
+    getAllSelectedNodes,
+    removeNodesFromSelection,
+  } = useSelection();
 
   // ---- вкладки для правого блока
   const [tabs, setTabs] = useState<SimpleTab[]>([]);
@@ -286,6 +304,138 @@ export default function App() {
     }
   };
 
+  // Групповое удаление выделенных элементов
+  const handleDeleteSelected = async () => {
+    if (!active) return;
+    const selectedIds = getSelectedNodeIds(active.id);
+    if (selectedIds.length === 0) return;
+    
+    const confirmMessage = `Удалить ${selectedIds.length} выделенных элементов? Это действие нельзя отменить.`;
+    if (!confirm(confirmMessage)) return;
+    
+    try {
+      // Удаляем узлы из дерева
+      const newNodes = removeMultipleNodes(active.nodes, selectedIds);
+      await updateNodesFor(active.id, newNodes);
+      
+      // Очищаем выделение
+      removeNodesFromSelection(active.id, selectedIds);
+      
+      lock(600);
+    } catch (error) {
+      console.error('Error deleting selected nodes:', error);
+      alert('Ошибка при удалении элементов');
+    }
+  };
+
+  // Групповое перемещение выделенных элементов
+  const handleMoveSelected = async () => {
+    if (!active) return;
+    const selectedIds = getSelectedNodeIds(active.id);
+    if (selectedIds.length === 0) return;
+    
+    // Получаем список доступных целей для перемещения
+    const targets: Array<{label: string, value: string | null, treeId: string}> = [];
+    
+    // Добавляем корни всех деревьев
+    trees.forEach(tree => {
+      targets.push({
+        label: `[Корень] ${tree.title}`,
+        value: null,
+        treeId: tree.id
+      });
+    });
+    
+    // Рекурсивно добавляем папки (не ссылки) из активного дерева
+    const addFolders = (nodes: TreeNode[], prefix = '') => {
+      nodes.forEach(node => {
+        if (!node.url && !selectedIds.includes(node.id)) { // Только папки, не выделенные
+          targets.push({
+            label: `${prefix}${node.title}`,
+            value: node.id,
+            treeId: active.id
+          });
+          if (node.children) {
+            addFolders(node.children, `${prefix}${node.title} / `);
+          }
+        }
+      });
+    };
+    
+    addFolders(active.nodes);
+    
+    // Показываем диалог выбора
+    const targetOptions = targets.map((t, i) => `${i + 1}. ${t.label}`).join('\n');
+    const choice = prompt(
+      `Переместить ${selectedIds.length} элементов в:\n\n${targetOptions}\n\nВведите номер:`,
+      '1'
+    );
+    
+    if (!choice) return;
+    
+    const targetIndex = parseInt(choice) - 1;
+    if (isNaN(targetIndex) || targetIndex < 0 || targetIndex >= targets.length) {
+      alert('Неверный номер');
+      return;
+    }
+    
+    const target = targets[targetIndex];
+    
+    try {
+      if (target.treeId === active.id) {
+        // Перемещение в пределах текущего дерева
+        const newNodes = moveMultipleNodes(active.nodes, selectedIds, target.value);
+        await updateNodesFor(active.id, newNodes);
+      } else {
+        // Перемещение в другое дерево
+        const targetTree = trees.find(t => t.id === target.treeId);
+        if (!targetTree) {
+          alert('Целевое дерево не найдено');
+          return;
+        }
+        
+        // Извлекаем узлы из текущего дерева
+        const newSourceNodes = removeMultipleNodes(active.nodes, selectedIds);
+        
+        // Получаем сами узлы для перемещения
+        const nodesToMove: TreeNode[] = [];
+        const findNodes = (nodes: TreeNode[]) => {
+          nodes.forEach(node => {
+            if (selectedIds.includes(node.id)) {
+              nodesToMove.push(node);
+            }
+            if (node.children) {
+              findNodes(node.children);
+            }
+          });
+        };
+        findNodes(active.nodes);
+        
+        // Добавляем в целевое дерево
+        let newTargetNodes = targetTree.nodes;
+        if (target.value === null) {
+          // В корень
+          newTargetNodes = [...nodesToMove, ...targetTree.nodes];
+        } else {
+          // В конкретную папку
+          newTargetNodes = moveMultipleNodes(targetTree.nodes, nodesToMove.map(n => n.id), target.value);
+        }
+        
+        // Обновляем оба дерева
+        await updateNodesFor(active.id, newSourceNodes);
+        await updateNodesFor(target.treeId, newTargetNodes);
+      }
+      
+      // Очищаем выделение
+      removeNodesFromSelection(active.id, selectedIds);
+      
+      lock(600);
+    } catch (error) {
+      console.error('Error moving selected nodes:', error);
+      alert('Ошибка при перемещении элементов');
+    }
+  };
+
   function faviconFor(tab: SimpleTab) {
     if (tab.favIconUrl && /^https?:/i.test(tab.favIconUrl)) return tab.favIconUrl;
     if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) return "";
@@ -360,36 +510,122 @@ export default function App() {
       <div className="main" onMouseEnter={() => setAllowHover(false)}>
         <div className="card">
           {active ? (
-            <Tree
-              doc={active}
-              selectedTab={selTab}
-              // Tree просит App зафиксировать узлы (синхронизация состояния trees)
-              onCommitNodes={async (docId, nodes) => {
-                await updateNodesFor(docId, nodes);
-              }}
-              onAddRootCategory={async () => {
-                if (!active) return;
-                lock(600);
-                const name = prompt("Название категории")?.trim();
-                if (!name) return;
-                const node: TreeNode = { id: crypto.randomUUID(), title: name, children: [] };
-                await updateNodesFor(active.id, [node, ...active.nodes]);
-              }}
-              onAddCurrentTabToRoot={async () => {
-                if (!active || !selTab) { alert("Выберите вкладку выше"); return; }
-                lock(600);
-                const node: TreeNode = {
-                  id: crypto.randomUUID(),
-                  title: selTab.title || selTab.url,
-                  url: selTab.url,
-                  children: [],
-                };
-                await updateNodesFor(active.id, [node, ...active.nodes]);
-              }}
-              forceExpand={forceExpand}
-              uiState={getState(active.id)}
-              onUpdateUIState={(updater) => updateState(active.id, updater)}
-            />
+            <>
+              <SelectionIndicator
+                selectionCount={getSelectionCount()}
+                selectionMode={selectionState.selectionMode}
+                moveMode={selectionState.moveMode}
+                onToggleSelectionMode={toggleSelectionMode}
+                onToggleMoveMode={toggleMoveMode}
+                onClearSelection={clearSelection}
+                onDeleteSelected={handleDeleteSelected}
+              />
+              <Tree
+                doc={active}
+                selectedTab={selTab}
+                // Tree просит App зафиксировать узлы (синхронизация состояния trees)
+                onCommitNodes={async (docId, nodes) => {
+                  await updateNodesFor(docId, nodes);
+                }}
+                onAddRootCategory={async () => {
+                  if (!active) return;
+                  lock(600);
+                  const name = prompt("Название категории")?.trim();
+                  if (!name) return;
+                  const node: TreeNode = { id: crypto.randomUUID(), title: name, children: [] };
+                  await updateNodesFor(active.id, [node, ...active.nodes]);
+                }}
+                onAddCurrentTabToRoot={async () => {
+                  try {
+                    if (!active) return;
+                    lock(600);
+                    
+                    // Получаем выделенные закладки для проверки
+                    let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
+                    
+                    if (selectionState.selectionMode) {
+                      // Получаем выделенные узлы (ссылки и папки)
+                      const allSelected = getAllSelectedNodes()
+                      selectedNodes = allSelected.map((item: any) => ({
+                        treeId: item.treeId,
+                        nodeId: item.nodeId,
+                        title: item.title,
+                        url: item.url
+                      }))
+                    }
+                    
+                    // Получаем элементы для добавления по приоритету
+                    const itemsToAdd = await getUniversalItemsToAdd({
+                      selectedNodes,
+                      selectedTab: selTab,
+                      sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes }))
+                    })
+                    
+                    if (itemsToAdd.length === 0) {
+                      alert('Нет элементов для добавления. Выберите вкладку выше.')
+                      return
+                    }
+                    
+                    // Определяем источник для обработки
+                    const source = itemsToAdd[0].source
+                    
+                    if (source === 'selection') {
+                      // Используем простое копирование
+                      try {
+                        const copiedNodes = await copySelectedNodes({
+                          selectedNodes,
+                          sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes })),
+                          moveMode: selectionState.moveMode,
+                          onUpdateTree: updateNodesFor,
+                          targetTreeId: active.id // Для определения внутридерева перемещений
+                        })
+                        
+                        if (copiedNodes.length > 0) {
+                          await updateNodesFor(active.id, [...copiedNodes, ...active.nodes])
+                          
+                          // Очищаем выделение
+                          selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
+                          
+                          console.log(`Успешно ${selectionState.moveMode ? 'перемещено' : 'скопировано'} в корень: ${copiedNodes.length} элементов`)
+                        } else {
+                          alert('Не удалось скопировать выделенные элементы')
+                        }
+                      } catch (error) {
+                        console.error('Error copying to root:', error)
+                        alert('Ошибка при копировании: ' + (error as Error).message)
+                      }
+                    } else {
+                      // Добавляем новые узлы в корень
+                      const newNodes = itemsToAdd.map(universalItemToTreeNode)
+                      await updateNodesFor(active.id, [...newNodes, ...active.nodes])
+                    }
+                    
+                    // Показываем уведомление о результате
+                    const description = getSourceDescription(source, itemsToAdd.length)
+                    console.log(`Успешно ${source === 'selection' ? (selectionState.moveMode ? 'перемещено' : 'скопировано') : 'добавлено'} в корень: ${description}`)
+                    
+                  } catch (error) {
+                    console.error('Error in onAddCurrentTabToRoot:', error)
+                    alert('Ошибка при добавлении элементов: ' + (error as Error).message)
+                  }
+                }}
+
+                forceExpand={forceExpand}
+                uiState={getState(active.id)}
+                onUpdateUIState={(updater) => updateState(active.id, updater)}
+                // Новые пропсы для системы выделения
+                selectionMode={selectionState.selectionMode}
+                moveMode={selectionState.moveMode}
+                isNodeSelected={(nodeId: string) => isNodeSelected(active.id, nodeId)}
+                onToggleNodeSelection={(node: TreeNode) => toggleNodeSelection(active.id, node)}
+                onDeleteSelected={handleDeleteSelected}
+                removeNodesFromSelection={removeNodesFromSelection}
+                // Параметры для универсального переноса
+                allTrees={trees}
+                onUpdateTreeNodes={updateNodesFor}
+                globalIsNodeSelected={isNodeSelected}
+              />
+            </>
           ) : (
             <div className="muted">Создайте первое дерево</div>
           )}
@@ -424,10 +660,77 @@ export default function App() {
               <div className="row" style={{ marginTop: 8, gap: 8 }}>
                 <button onClick={() => chrome.tabs.update(selTab.id, { active: true })}>Перейти к вкладке</button>
                 <button onClick={async () => {
-                  if (!active || !selTab) return;
-                  lock(600);
-                  const node: TreeNode = { id: crypto.randomUUID(), title: selTab.title || selTab.url, url: selTab.url, children: [] };
-                  await updateNodesFor(active.id, [node, ...active.nodes]);
+                  try {
+                    if (!active) return;
+                    lock(600);
+                    
+                    // Получаем выделенные закладки для проверки
+                    let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
+                    
+                    if (selectionState.selectionMode) {
+                      // Получаем выделенные узлы (ссылки и папки)
+                      const allSelected = getAllSelectedNodes()
+                      selectedNodes = allSelected.map((item: any) => ({
+                        treeId: item.treeId,
+                        nodeId: item.nodeId,
+                        title: item.title,
+                        url: item.url
+                      }))
+                    }
+                    
+                    // Получаем элементы для добавления по приоритету
+                    const itemsToAdd = await getUniversalItemsToAdd({
+                      selectedNodes,
+                      selectedTab: selTab,
+                      sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes }))
+                    })
+                    
+                    if (itemsToAdd.length === 0) {
+                      alert('Нет элементов для добавления. Выберите вкладку выше.')
+                      return
+                    }
+                    
+                    // Определяем источник для обработки
+                    const source = itemsToAdd[0].source
+                    
+                    if (source === 'selection') {
+                      // Используем простое копирование
+                      try {
+                        const copiedNodes = await copySelectedNodes({
+                          selectedNodes,
+                          sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes })),
+                          moveMode: selectionState.moveMode,
+                          onUpdateTree: updateNodesFor
+                        })
+                        
+                        if (copiedNodes.length > 0) {
+                          await updateNodesFor(active.id, [...copiedNodes, ...active.nodes])
+                          
+                          // Очищаем выделение
+                          selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
+                          
+                          console.log(`Успешно ${selectionState.moveMode ? 'перемещено' : 'скопировано'} в корень: ${copiedNodes.length} элементов`)
+                        } else {
+                          alert('Не удалось скопировать выделенные элементы')
+                        }
+                      } catch (error) {
+                        console.error('Error copying to root:', error)
+                        alert('Ошибка при копировании: ' + (error as Error).message)
+                      }
+                    } else {
+                      // Добавляем новые узлы в корень
+                      const newNodes = itemsToAdd.map(universalItemToTreeNode)
+                      await updateNodesFor(active.id, [...newNodes, ...active.nodes])
+                    }
+                    
+                    // Показываем уведомление о результате
+                    const description = getSourceDescription(source, itemsToAdd.length)
+                    console.log(`Успешно ${source === 'selection' ? (selectionState.moveMode ? 'перемещено' : 'скопировано') : 'добавлено'} в корень: ${description}`)
+                    
+                  } catch (error) {
+                    console.error('Error in + В корень button:', error)
+                    alert('Ошибка при добавлении элементов: ' + (error as Error).message)
+                  }
                 }}>+ В корень</button>
                 <button onClick={async () => {
                   if (!selTab || !active) return;
