@@ -1,6 +1,6 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.5.2-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.5.3-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
@@ -15,6 +15,10 @@ A powerful Chrome extension for managing bookmarks in a visual tree structure wi
   - **Move/Copy Toggle**: Switch between move (✂️) and copy (📋) modes with session persistence
   - **Cross-tree Operations**: Move or copy bookmarks between different trees seamlessly
   - **Intra-tree Moves**: Reliable within-tree bookmark reorganization
+- **Link Parent Feature**: Links can now contain child nodes, acting as both bookmarks and folders
+  - **Visual Differentiation**: Links with children display as hollow circles with blue borders
+  - **Dual Functionality**: Click to expand/collapse if has children, click to open URL if no children
+  - **Full Actions**: All operations (add category, add tabs) available for link parents
 - **Local Storage**: SQLite database with WebAssembly for reliable local storage
 - **Offline Saving**: Save web pages as MHTML files for offline access
 - **Search & Filter**: Advanced search and level-based filtering
@@ -73,6 +77,10 @@ This starts development mode with hot reload and automatic rebuilding.
 5. **Search**: Use the search bar to find specific bookmarks
 6. **Filter by Level**: Use level buttons (0, 1, 2, "All") to control tree depth display
 7. **Offline Save**: Save web pages locally with the "+ В корень (офлайн)" button
+8. **Link Parent Feature**: 
+   - Add child nodes to any link using the "📁＋" or "🔗⇧" buttons
+   - Links with children can be expanded/collapsed like folders
+   - Links without children open the URL directly when clicked
 
 ### Selection & Move/Copy Operations
 
@@ -94,6 +102,7 @@ This starts development mode with hot reload and automatic rebuilding.
 - **Panel View**: Click the "⛶" button to open a larger management window
 - **Export/Import**: Backup your data using JSON export/import
 - **Theme Switching**: Choose between light, dark, or system theme
+- **Link Parent Nodes**: Create complex hierarchies where links can contain other bookmarks
 
 ## 🛠 Technical Stack
 
@@ -159,7 +168,15 @@ src/
 
 ## 📋 Changelog
 
-### v0.1.5.2 (Latest)
+### v0.1.5.3 (Latest)
+- **NEW: Link Parent Feature**: Links can now contain child nodes, acting as both bookmarks and folders
+  - Visual differentiation with hollow blue circles for links with children
+  - Dual functionality: expand/collapse if has children, open URL if no children
+  - All actions (add category, add tabs) now available for link parents
+- **IMPROVED: UI/UX**: Enhanced visual feedback for different node types
+- **ADDED: Technical Documentation**: Comprehensive documentation for link parent functionality
+
+### v0.1.5.2
 - **NEW: Move/Copy Mode Toggle**: Added dual-mode transfer system with visual toggle between move (✂️) and copy (📋) operations
 - **NEW: Universal Selection System**: Implemented advanced bookmark selection with visual checkboxes and multi-tree support
 - **NEW: Cross-tree Operations**: Enable moving and copying bookmarks between different trees seamlessly
