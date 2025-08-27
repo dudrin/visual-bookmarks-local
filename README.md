@@ -1,6 +1,6 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.5.1-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.5.2-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
@@ -10,6 +10,11 @@ A powerful Chrome extension for managing bookmarks in a visual tree structure wi
 
 - **Tree Structure**: Organize bookmarks in hierarchical trees instead of flat lists
 - **Multiple Trees**: Create and manage multiple bookmark trees for different projects
+- **Selection & Move/Copy System**: Advanced bookmark management with visual selection and dual-mode operations
+  - **Selection Mode**: Toggle selection mode (☑) to select multiple bookmarks across trees
+  - **Move/Copy Toggle**: Switch between move (✂️) and copy (📋) modes with session persistence
+  - **Cross-tree Operations**: Move or copy bookmarks between different trees seamlessly
+  - **Intra-tree Moves**: Reliable within-tree bookmark reorganization
 - **Local Storage**: SQLite database with WebAssembly for reliable local storage
 - **Offline Saving**: Save web pages as MHTML files for offline access
 - **Search & Filter**: Advanced search and level-based filtering
@@ -69,6 +74,20 @@ This starts development mode with hot reload and automatic rebuilding.
 6. **Filter by Level**: Use level buttons (0, 1, 2, "All") to control tree depth display
 7. **Offline Save**: Save web pages locally with the "+ В корень (офлайн)" button
 
+### Selection & Move/Copy Operations
+
+1. **Enable Selection Mode**: Click the selection button (☑) to enter selection mode
+2. **Select Bookmarks**: 
+   - Click on bookmarks to select them (checkboxes appear)
+   - Select across multiple trees for cross-tree operations
+3. **Choose Operation Mode**:
+   - **Copy Mode** (📋): Creates duplicates with new IDs (default)
+   - **Move Mode** (✂️): Transfers bookmarks, removing them from source
+4. **Execute Operations**:
+   - Use 🔗⇧ buttons on folders to move/copy selected items into that folder
+   - Use "🔗⇧ + Выделенное (в корень)" to move/copy to tree root
+5. **Clear Selection**: Click "✕ Убрать выделение" when done
+
 ### Advanced Features
 
 - **Context Menus**: Right-click on tabs to add selected tabs to your trees
@@ -90,9 +109,12 @@ This starts development mode with hot reload and automatic rebuilding.
 src/
 ├── background.ts          # Service worker for Chrome extension
 ├── models.ts             # TypeScript interfaces and types
+├── universalAdd.ts       # Universal transfer and move/copy operations
 ├── popup/               # Main popup interface
 │   ├── App.tsx          # Main React component
 │   ├── Tree.tsx         # Tree visualization component
+│   ├── SelectionIndicator.tsx # Selection mode UI controls
+│   ├── useSelection.ts  # Selection state management hook
 │   ├── useTreeStates.ts # State management hook
 │   ├── popup.html       # Popup HTML template
 │   └── popup.css        # Styling
@@ -120,8 +142,12 @@ src/
 1. **Background Script** (`background.ts`): Handles Chrome API interactions
 2. **Main App** (`App.tsx`): Core React application with tree management
 3. **Tree Component** (`Tree.tsx`): Visual tree representation with drag-and-drop
-4. **SQL Storage** (`sqlStorage.ts`): Database operations and state management
-5. **State Management** (`useTreeStates.ts`): Persistent UI state across sessions
+4. **Selection System**:
+   - **SelectionIndicator** (`SelectionIndicator.tsx`): UI controls for selection mode
+   - **useSelection** (`useSelection.ts`): Selection state management with persistence
+   - **universalAdd** (`universalAdd.ts`): Universal transfer operations and move/copy logic
+5. **SQL Storage** (`sqlStorage.ts`): Database operations and state management
+6. **State Management** (`useTreeStates.ts`): Persistent UI state across sessions
 
 ## 🤝 Contributing
 
@@ -133,7 +159,18 @@ src/
 
 ## 📋 Changelog
 
-### v0.1.5.1 (Latest)
+### v0.1.5.2 (Latest)
+- **NEW: Move/Copy Mode Toggle**: Added dual-mode transfer system with visual toggle between move (✂️) and copy (📋) operations
+- **NEW: Universal Selection System**: Implemented advanced bookmark selection with visual checkboxes and multi-tree support
+- **NEW: Cross-tree Operations**: Enable moving and copying bookmarks between different trees seamlessly
+- **FIXED: Intra-tree Move Bug**: Resolved issue where bookmarks disappeared when moving within the same tree
+- **IMPROVED: Session Persistence**: Move/copy mode and selection state now persist across browser sessions
+- **IMPROVED: Build Optimization**: Eliminated Vite static/dynamic import conflicts for better performance
+- **ADDED: Selection UI Controls**: New SelectionIndicator component with clear visual feedback
+- **ADDED: Universal Transfer Logic**: Simplified copy+delete pattern for reliable move operations
+- **ADDED: Comprehensive Documentation**: Added detailed guides for move functionality and troubleshooting
+
+### v0.1.5.1
 - **Fixed level filtering functionality**: Restored tree level buttons (0, 1, 2, "All") with proper state management
 - **Improved tab group context awareness**: New tabs now open in correct tab groups using priority-based resolution
 - **Fixed context menu duplicate errors**: Resolved "Cannot create item with duplicate id" crashes during extension reloads
