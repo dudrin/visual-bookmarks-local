@@ -1,6 +1,6 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.5.3-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.5.5-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
@@ -168,7 +168,13 @@ src/
 
 ## 📋 Changelog
 
-### v0.1.5.4 (Latest)
+### v0.1.5.5 (Latest)
+- **IMPROVED: UI Alignment**: Fixed visual alignment issues with action buttons in the tree view
+  - Consistent fixed-width styling for all action buttons
+  - Proper spacing and alignment of icon buttons regardless of content
+- **FIXED: Comment System UI**: Resolved visual artifacts and alignment issues with comment indicators
+
+### v0.1.5.4
 - **NEW: Node Comment System**: Added ability to add comments to any tree node (bookmark or folder)
   - Visual indication of nodes with comments (left border highlight)
   - Dedicated comment button (💬) for adding/editing comments

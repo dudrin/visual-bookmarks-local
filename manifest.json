@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Visual Bookmarks Tree (Local)",
-  "version": "0.1.5.4",
+  "version": "0.1.5.5",
   "description": "Графические древовидные закладки с локальным хранением и офлайн-копиями (MHTML).",
   "action": { "default_title": "Visual Bookmarks" },
   "icons": {
