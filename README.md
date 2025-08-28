@@ -169,6 +169,12 @@ src/
 ## 📋 Changelog
 
 ### v0.1.5.5 (Latest)
+- **NEW: Complete Node Comment System**: Implemented full comment functionality for all tree nodes (bookmarks and folders)
+  - Dedicated comment button (💬) for adding/editing comments on any node
+  - Visual indication of nodes with comments (subtle background highlight)
+  - Comments are persisted in the local SQLite database
+  - Comment text displayed in tooltip when hovering over the comment button
+  - Visual styling for nodes with comments and active comment buttons
 - **IMPROVED: UI Alignment**: Fixed visual alignment issues with action buttons in the tree view
   - Consistent fixed-width styling for all action buttons
   - Proper spacing and alignment of icon buttons regardless of content
