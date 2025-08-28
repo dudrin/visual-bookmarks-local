@@ -121,6 +121,7 @@ function bootstrap(d: Database) {
       offline_id INTEGER NULL,
       offline_path TEXT NULL,
       mime TEXT NULL,
+      comment TEXT NULL,
       FOREIGN KEY(doc_id) REFERENCES trees(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_nodes_doc ON nodes(doc_id, parent_id, order_index);
@@ -152,7 +153,7 @@ function buildTreeForDoc(rows: any[]): TreeNode[] {
     const node: TreeNode = {
       id: r.id, title: r.title, url: r.url || undefined,
       offlineId: r.offline_id ?? undefined, offlinePath: r.offline_path ?? undefined,
-      mime: r.mime ?? null, children: [],
+      mime: r.mime ?? null, comment: r.comment || undefined, children: [],
     };
     byId.set(node.id, node);
     const pid = (r.parent_id as string | null) ?? null;
@@ -170,7 +171,7 @@ function flattenNodes(docId: string, roots: TreeNode[]) {
       out.push({
         id: n.id, parent_id: parent, title: n.title, url: n.url ?? null,
         order_index: idx, offline_id: n.offlineId ?? null, offline_path: n.offlinePath ?? null,
-        mime: n.mime ?? null, doc_id: docId,
+        mime: n.mime ?? null, comment: n.comment ?? null, doc_id: docId,
       });
       if (n.children?.length) walk(n.children, n.id);
     });
@@ -207,7 +208,7 @@ export async function loadState(): Promise<{ trees: TreeDocument[] }> {
   const rows = t[0]?.values || [];
   for (const [id, title, created_at] of rows) {
     const n = d.exec(
-      `SELECT id, parent_id, title, url, order_index, offline_id, offline_path, mime
+      `SELECT id, parent_id, title, url, order_index, offline_id, offline_path, mime, comment
        FROM nodes WHERE doc_id=?
        ORDER BY parent_id IS NOT NULL, parent_id, order_index`,
       [id as string]
@@ -215,7 +216,7 @@ export async function loadState(): Promise<{ trees: TreeDocument[] }> {
     const nodesRows =
       n[0]?.values?.map((v: any[]) => ({
         id: v[0], parent_id: v[1], title: v[2], url: v[3],
-        order_index: v[4], offline_id: v[5], offline_path: v[6], mime: v[7],
+        order_index: v[4], offline_id: v[5], offline_path: v[6], mime: v[7], comment: v[8]
       })) || [];
     trees.push({ id: id as string, title: title as string, createdAt: created_at as string, nodes: buildTreeForDoc(nodesRows) });
   }
@@ -256,11 +257,11 @@ export async function upsertNodes(docId: string, nodes: TreeNode[]): Promise<Tre
     withParent: flat.filter(r => r.parent_id !== null).length });
     
   const stmt = d.prepare(
-    `INSERT INTO nodes(id,doc_id,parent_id,title,url,order_index,offline_id,offline_path,mime)
-     VALUES(?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO nodes(id,doc_id,parent_id,title,url,order_index,offline_id,offline_path,mime,comment)
+     VALUES(?,?,?,?,?,?,?,?,?,?)`
   );
   try {
-    flat.forEach(r => stmt.run([r.id, docId, r.parent_id, r.title, r.url, r.order_index, r.offline_id, r.offline_path, r.mime]));
+    flat.forEach(r => stmt.run([r.id, docId, r.parent_id, r.title, r.url, r.order_index, r.offline_id, r.offline_path, r.mime, r.comment]));
   } finally { stmt.free(); }
   scheduleSave(); await saveNow();
   const st = await loadState();

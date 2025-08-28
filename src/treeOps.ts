@@ -121,3 +121,14 @@ export function moveMultipleNodes(list: TreeNode[], nodeIds: string[], newParent
   
   return result
 }
+
+/**
+ * Update the comment for a specific node
+ * @param list The tree node list
+ * @param id The ID of the node to update
+ * @param comment The new comment text
+ * @returns Updated tree node list
+ */
+export function updateNodeComment(list: TreeNode[], id: string, comment: string): TreeNode[] {
+  return updateNode(list, id, node => ({ ...node, comment }));
+}

@@ -168,7 +168,15 @@ src/
 
 ## 📋 Changelog
 
-### v0.1.5.3 (Latest)
+### v0.1.5.4 (Latest)
+- **NEW: Node Comment System**: Added ability to add comments to any tree node (bookmark or folder)
+  - Visual indication of nodes with comments (left border highlight)
+  - Dedicated comment button (💬) for adding/editing comments
+  - Comments are persisted in the local SQLite database
+  - Comment text displayed in tooltip when hovering over the comment button
+  - Visual styling for nodes with comments and active comment buttons
+
+### v0.1.5.3
 - **NEW: Link Parent Feature**: Links can now contain child nodes, acting as both bookmarks and folders
   - Visual differentiation with hollow blue circles for links with children
   - Dual functionality: expand/collapse if has children, open URL if no children

@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import type { TreeDocument, TreeNode, TreeUIState } from '../models'
 import { filterTree, highlight } from '../search'
-import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes } from '../treeOps'
+import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes, updateNodeComment } from '../treeOps'
 import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
 type Props = {
@@ -393,6 +393,12 @@ const NodeView: React.FC<{
     await saveNodes(removeNode(allNodes, node.id))
   }
 
+  const editComment = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const comment = prompt('Введите комментарий', node.comment || '')?.trim() || ''
+    await saveNodes(updateNodeComment(allNodes, node.id, comment))
+  }
+
   const onDragStart = (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', node.id); e.dataTransfer.effectAllowed = 'move' }
   const onDragOver  = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
   const onDrop = async (e: React.DragEvent) => {
@@ -448,7 +454,7 @@ const NodeView: React.FC<{
   return (
     <div className="node" draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>
       <div
-        className={`node-row ${isSelected ? 'selected' : ''}`}
+        className={`node-row ${isSelected ? 'selected' : ''} ${node.comment ? 'has-comment' : ''}`}
         role="treeitem"
         aria-expanded={(!isLink || hasChildren) ? effectiveOpen : undefined}
         tabIndex={-1}
@@ -487,6 +493,14 @@ const NodeView: React.FC<{
           <button className="icon-btn" title="Добавить категорию" onClick={addCategoryHere}>📁＋</button>
           {/* Всегда показываем кнопку добавления выделенных вкладок */}
           <button className="icon-btn" title="Добавить выделенные вкладки (используйте ПКМ → 'Добавить выделенные вкладки')" onClick={addSelectedTabHere}>🔗⇧</button>
+          {/* Кнопка для редактирования комментария */}
+          <button 
+            className={`icon-btn ${node.comment ? 'comment-active' : ''}`} 
+            title={node.comment ? `Комментарий: ${node.comment}` : "Добавить комментарий"} 
+            onClick={editComment}
+          >
+            {node.comment ? '💬' : '💬＋'}
+          </button>
           <button className="icon-btn" title="Переименовать" onClick={renameHere}>✏️</button>
           <button className="icon-btn" title="Удалить" onClick={deleteHere}>🗑️</button>
         </div>

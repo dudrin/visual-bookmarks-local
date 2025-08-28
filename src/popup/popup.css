@@ -57,9 +57,39 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
 }
 .node-actions{margin-left:auto;display:flex;gap:6px}
 .icon-btn { background:transparent; border:none; cursor:pointer; }
+
+/* Фиксированная ширина для всех кнопок действий, чтобы обеспечить выравнивание */
+.node-actions .icon-btn {
+  min-width: 36px;
+  text-align: center;
+  padding: 0 2px;
+}
+
 .favicon{width:16px;height:16px;border-radius:3px;flex:0 0 16px}
 .link-wrap{display:flex;align-items:center;gap:6px;min-width:0}
 .link-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Стиль для узлов с комментариями */
+.node-row.has-comment {
+  /* Убираем border-left и padding-left, которые могут вызывать визуальные артефакты */
+  /* Вместо этого используем более мягкий визуальный индикатор */
+  background: linear-gradient(to right, color-mix(in oklab, var(--accent) 20%, transparent) 0%, transparent 100%);
+}
+
+/* Стиль для кнопки комментария с активным комментарием */
+.icon-btn.comment-active {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* Стили для выделенных узлов */
+.node-row.selected {
+  background: color-mix(in oklab, var(--accent) 20%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
 .footer{
   flex-shrink:0;
   background: var(--bg);

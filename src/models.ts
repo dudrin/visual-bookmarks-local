@@ -7,6 +7,8 @@ export type TreeNode = {
   offlineId?: number;        // chrome.downloads id
   offlinePath?: string;      // путь файла в системе загрузок
   mime?: string | null;      // тип, если это документ/изображение/архив и т.п.
+  // комментарий к узлу
+  comment?: string;          // текст комментария к узлу
 };
 
 // Состояние UI для каждого дерева
