@@ -11,8 +11,10 @@
     "strict": true,
     "baseUrl": ".",
     "types": [
-      "chrome"
-    ]
+      "chrome",
+      "jest"
+    ],
+    "esModuleInterop": true
   },
   "include": [
     "src"
