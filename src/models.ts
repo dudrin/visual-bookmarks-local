@@ -40,4 +40,15 @@ export type TreeDocument = {
   createdAt?: string; // ISO
 };
 
+// Интерфейс для тестирования
+export interface BookmarkNode {
+  id: number;
+  title: string;
+  url: string;
+  parentId: number;
+  treeId: number;
+  isFolder: boolean;
+  position: number;
+}
+
 export const DEBUG = false;
