@@ -10,7 +10,9 @@
     "copy-wasm": "node scripts/copy-wasm.cjs",
     "dev": "npm run copy-wasm && node scripts/dev-watch.cjs",
     "build": "npm run copy-wasm && vite build && node scripts/postbuild.cjs",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.cjs",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.cjs --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.cjs --coverage"
   },
   "dependencies": {
     "react": "^18.3.1",
