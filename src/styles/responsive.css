@@ -1,0 +1,271 @@
+/* Стили для адаптивности на мобильных устройствах */
+
+/* Базовые медиа-запросы */
+/* Маленькие устройства (телефоны, 576px и меньше) */
+@media (max-width: 576px) {
+  :root {
+    /* Уменьшаем размеры шрифтов для мобильных устройств */
+    --font-size-xs: 0.7rem;
+    --font-size-sm: 0.8rem;
+    --font-size-md: 0.9rem;
+    --font-size-lg: 1rem;
+    --font-size-xl: 1.1rem;
+    --font-size-2xl: 1.3rem;
+    --font-size-3xl: 1.5rem;
+    --font-size-4xl: 1.8rem;
+    
+    /* Уменьшаем отступы */
+    --spacing-4: 0.8rem;
+    --spacing-6: 1.2rem;
+    --spacing-8: 1.6rem;
+    --spacing-10: 2rem;
+    --spacing-12: 2.4rem;
+    --spacing-16: 3.2rem;
+  }
+  
+  /* Скрываем некоторые элементы на мобильных устройствах */
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  /* Делаем кнопки больше для удобства нажатия на сенсорных экранах */
+  .btn {
+    padding: var(--spacing-2) var(--spacing-4);
+    min-height: 44px; /* Минимальная высота для удобного нажатия */
+  }
+  
+  /* Увеличиваем отступы в формах для удобства на сенсорных экранах */
+  .form-control {
+    padding: var(--spacing-3) var(--spacing-3);
+    min-height: 44px;
+  }
+  
+  /* Адаптируем карточки */
+  .card {
+    margin-bottom: var(--spacing-4);
+  }
+  
+  /* Адаптируем модальные окна */
+  .modal {
+    width: 95%;
+    max-height: 80vh;
+  }
+  
+  /* Адаптируем заголовки */
+  h1 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  h2 {
+    font-size: var(--font-size-xl);
+  }
+  
+  h3 {
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* Средние устройства (планшеты, 768px и меньше) */
+@media (max-width: 768px) {
+  /* Изменяем структуру приложения для планшетов */
+  .app-container {
+    flex-direction: column;
+  }
+  
+  .app-sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-gray-300);
+  }
+  
+  .app-main {
+    width: 100%;
+  }
+  
+  /* Адаптируем таблицы */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  /* Адаптируем сетку */
+  .row {
+    flex-direction: column;
+  }
+  
+  .col {
+    width: 100%;
+    margin-bottom: var(--spacing-4);
+  }
+}
+
+/* Большие устройства (десктопы, 992px и меньше) */
+@media (max-width: 992px) {
+  /* Адаптируем сайдбар */
+  .app-sidebar {
+    width: 200px;
+  }
+}
+
+/* Очень большие устройства (большие десктопы, 1200px и меньше) */
+@media (max-width: 1200px) {
+  /* Адаптируем контейнеры */
+  .container {
+    max-width: 100%;
+    padding-left: var(--spacing-4);
+    padding-right: var(--spacing-4);
+  }
+}
+
+/* Специфичные стили для компонентов на мобильных устройствах */
+
+/* Адаптация компонента Tag */
+@media (max-width: 576px) {
+  .tag {
+    margin-bottom: var(--spacing-2);
+  }
+}
+
+/* Адаптация компонента TagManager */
+@media (max-width: 576px) {
+  .tag-manager .tag-create {
+    flex-direction: column;
+  }
+  
+  .tag-manager .tag-create input[type="color"] {
+    width: 100%;
+    margin-top: var(--spacing-2);
+  }
+}
+
+/* Адаптация компонента SearchResults */
+@media (max-width: 576px) {
+  .search-result-item {
+    padding: var(--spacing-2);
+  }
+  
+  .search-result-item h4 {
+    font-size: var(--font-size-md);
+  }
+}
+
+/* Адаптация компонента RichTextEditor */
+@media (max-width: 768px) {
+  .editor-toolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .editor-toolbar button {
+    margin-bottom: var(--spacing-2);
+  }
+}
+
+/* Адаптация компонента NoteModal */
+@media (max-width: 576px) {
+  .note-modal {
+    width: 95%;
+    max-height: 80vh;
+  }
+  
+  .note-modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .note-modal-header h2 {
+    margin-bottom: var(--spacing-2);
+  }
+  
+  .note-modal-header .btn-group {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+  }
+}
+
+/* Адаптация компонента PagePreview */
+@media (max-width: 576px) {
+  .page-preview {
+    width: 100% !important;
+    left: 0 !important;
+  }
+}
+
+/* Улучшения для сенсорных устройств */
+@media (hover: none) {
+  /* Увеличиваем размер интерактивных элементов */
+  button, 
+  input[type="button"], 
+  input[type="submit"],
+  input[type="reset"],
+  a.btn,
+  .interactive-element {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Увеличиваем отступы между интерактивными элементами */
+  .touch-friendly-container > * {
+    margin-bottom: var(--spacing-3);
+  }
+  
+  /* Добавляем дополнительное пространство для скролла */
+  .scrollable-container {
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--spacing-8);
+  }
+}
+
+/* Ориентация устройства */
+/* Портретная ориентация */
+@media (orientation: portrait) {
+  .landscape-only {
+    display: none;
+  }
+}
+
+/* Альбомная ориентация */
+@media (orientation: landscape) {
+  .portrait-only {
+    display: none;
+  }
+}
+
+/* Поддержка темного режима */
+@media (prefers-color-scheme: dark) {
+  /* Стили для темного режима определены в variables.css */
+  
+  /* Дополнительные специфичные стили для темного режима */
+  .card {
+    border-color: var(--dark-border-color);
+  }
+  
+  .form-control {
+    background-color: var(--dark-bg-card);
+    border-color: var(--dark-border-color);
+    color: var(--dark-text-primary);
+  }
+  
+  .btn-outline {
+    border-color: var(--color-primary-light);
+    color: var(--color-primary-light);
+  }
+  
+  .btn-outline:hover {
+    background-color: var(--color-primary);
+    color: var(--dark-text-primary);
+  }
+}
+
+/* Улучшения для доступности */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
