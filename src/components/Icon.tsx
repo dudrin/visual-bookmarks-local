@@ -18,12 +18,13 @@ export type IconType =
   | 'note'
   | 'close';
 
-interface IconProps {
+export interface IconProps {
   type: IconType;
   size?: number;
   color?: string;
   className?: string;
   onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -35,7 +36,8 @@ const Icon: React.FC<IconProps> = ({
   size = 16, 
   color = 'currentColor',
   className = '',
-  onClick
+  onClick,
+  style = {}
 }) => {
   // Объект с SVG-путями для каждого типа иконки
   const iconPaths: Record<IconType, string> = {
@@ -58,6 +60,12 @@ const Icon: React.FC<IconProps> = ({
 
   const path = iconPaths[type];
 
+  // Объединяем стили по умолчанию со стилями из props
+  const combinedStyles = {
+    cursor: onClick ? 'pointer' : 'default',
+    ...style
+  };
+
   return (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
@@ -67,7 +75,9 @@ const Icon: React.FC<IconProps> = ({
       fill={color}
       className={`icon icon-${type} ${className}`}
       onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={combinedStyles}
+      role="img"
+      aria-hidden="true"
     >
       <path d={path} />
     </svg>

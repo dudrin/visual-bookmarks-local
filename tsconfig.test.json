@@ -6,7 +6,8 @@
     "types": [
       "jest",
       "node",
-      "chrome"
+      "chrome",
+      "@testing-library/jest-dom"
     ],
     "esModuleInterop": true
   },
