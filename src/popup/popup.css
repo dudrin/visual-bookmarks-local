@@ -136,6 +136,78 @@ button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;backgro
   border-color: var(--accent);
 }
 
+/* ===== СТИЛИ ДЛЯ ПРЕДПРОСМОТРА ССЫЛОК ===== */
+.link-preview-container {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  min-width: 200px;
+  max-width: 320px;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.preview-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.preview-error {
+  color: #dc3545;
+  font-size: 14px;
+  padding: 8px;
+}
+
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.preview-image img {
+  width: 100%;
+  max-width: 320px;
+  max-height: 240px;
+  object-fit: contain;
+}
+
+.preview-url {
+  font-size: 14px;
+  color: var(--fg);
+  word-break: break-all;
+  text-align: center;
+}
+
 /* ===== СТИЛИ ДЛЯ СИСТЕМЫ ВЫДЕЛЕНИЯ ===== */
 
 /* Индикатор выделения */

@@ -4,6 +4,7 @@ import { filterTree, highlight } from '../search'
 import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes, updateNodeComment } from '../treeOps'
 import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
+import LinkPreview from './LinkPreview'
 type Props = {
   doc: TreeDocument
   onAddRootCategory: () => void
@@ -203,6 +204,9 @@ const NodeView: React.FC<{
   onUpdateTreeNodes?: (treeId: string, nodes: TreeNode[]) => Promise<void>
   globalIsNodeSelected?: (treeId: string, nodeId: string) => boolean
 }> = ({ node, q, allNodes, setAllNodes, docId, docTitle, forceExpand, selectedTab, depth = 0, maxLevel = -1, expandedNodes, onToggleExpanded, selectionMode = false, moveMode = false, isNodeSelected, onToggleNodeSelection, removeNodesFromSelection, allTrees = [], onUpdateTreeNodes, globalIsNodeSelected }) => {
+  // Состояние для предпросмотра ссылок
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
   // Определяем состояние выделения для этого узла
   const isSelected = isNodeSelected ? isNodeSelected(node.id) : false
   
@@ -417,8 +421,25 @@ const NodeView: React.FC<{
   const handleRowClick = (e: React.MouseEvent) => {
     if (selectionMode && onToggleNodeSelection) {
       // В режиме выделения - переключаем выделение
-      e.stopPropagation()
+      // Не останавливаем распространение события, чтобы работало раскрытие/закрытие
       onToggleNodeSelection(node)
+      
+      // Дополнительно обрабатываем раскрытие/закрытие папок и открытие ссылок
+      if (!isLink || hasChildren) {
+        // Управление раскрытием
+        if (isExpanded) {
+          // Сворачиваем: удаляем из expanded, добавляем в closed
+          onToggleExpanded(node.id, false)
+          onToggleExpanded(`closed:${node.id}`, true)
+        } else {
+          // Раскрываем: добавляем в expanded, удаляем из closed
+          onToggleExpanded(node.id, true)
+          onToggleExpanded(`closed:${node.id}`, false)
+        }
+      } else if (isLink && !hasChildren) {
+        // Открываем ссылку только если у нее нет дочерних элементов
+        openHere(e)
+      }
     } else if (!isLink || hasChildren) {
       // Обычный режим - управление раскрытием
       // При клике помечаем узел как явно управляемый пользователем
@@ -451,8 +472,33 @@ const NodeView: React.FC<{
     return 'folder'
   }
 
+  // Обработчики для предпросмотра ссылок
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (isLink) {
+      setPreviewPosition({ x: e.clientX, y: e.clientY });
+      setShowPreview(true);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isLink && showPreview) {
+      setPreviewPosition({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setShowPreview(false);
+  };
+
   return (
     <div className="node" draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>
+      {isLink && showPreview && node.url && (
+        <LinkPreview 
+          url={node.url} 
+          visible={showPreview} 
+          position={previewPosition} 
+        />
+      )}
       <div
         className={`node-row ${isSelected ? 'selected' : ''} ${node.comment ? 'has-comment' : ''}`}
         role="treeitem"
@@ -460,6 +506,9 @@ const NodeView: React.FC<{
         tabIndex={-1}
         data-node-id={node.id}
         onClick={handleRowClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         {selectionMode && (
           <div 
