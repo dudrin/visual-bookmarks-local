@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Icon from '../icons';
+import Icon from './Icon';
 
 interface PagePreviewProps {
   url: string;

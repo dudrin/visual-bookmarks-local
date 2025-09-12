@@ -4,6 +4,8 @@ import { filterTree, highlight } from '../search'
 import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes, updateNodeComment } from '../treeOps'
 import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
+import PagePreview from '../components/PagePreview'
+import { usePagePreview } from '../hooks/usePagePreview'
 type Props = {
   doc: TreeDocument
   onAddRootCategory: () => void
@@ -203,6 +205,12 @@ const NodeView: React.FC<{
   onUpdateTreeNodes?: (treeId: string, nodes: TreeNode[]) => Promise<void>
   globalIsNodeSelected?: (treeId: string, nodeId: string) => boolean
 }> = ({ node, q, allNodes, setAllNodes, docId, docTitle, forceExpand, selectedTab, depth = 0, maxLevel = -1, expandedNodes, onToggleExpanded, selectionMode = false, moveMode = false, isNodeSelected, onToggleNodeSelection, removeNodesFromSelection, allTrees = [], onUpdateTreeNodes, globalIsNodeSelected }) => {
+  // Хук для управления предпросмотром страниц
+  const { previewUrl, previewTitle, isVisible, position, showPreview, hidePreview } = usePagePreview({
+    delay: 800, // Задержка перед показом превью
+    enabled: !selectionMode // Отключаем превью в режиме выделения
+  })
+  
   // Определяем состояние выделения для этого узла
   const isSelected = isNodeSelected ? isNodeSelected(node.id) : false
   
@@ -437,6 +445,23 @@ const NodeView: React.FC<{
     }
   }
 
+  // Обработчики для предпросмотра страниц
+  const handleLinkMouseEnter = (e: React.MouseEvent) => {
+    if (!selectionMode && isLink && node.url) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      showPreview(
+        node.url, 
+        node.title, 
+        rect.right + 10, // Показываем справа от ссылки
+        rect.top
+      )
+    }
+  }
+
+  const handleLinkMouseLeave = () => {
+    hidePreview()
+  }
+
   // Определяем класс для точки узла
   const getDotClass = () => {
     if (isLink) {
@@ -459,7 +484,7 @@ const NodeView: React.FC<{
         aria-expanded={(!isLink || hasChildren) ? effectiveOpen : undefined}
         tabIndex={-1}
         data-node-id={node.id}
-        onClick={handleRowClick}
+        onClick={selectionMode ? undefined : handleRowClick}
       >
         {selectionMode && (
           <div 
@@ -468,9 +493,14 @@ const NodeView: React.FC<{
               e.stopPropagation()
               onToggleNodeSelection?.(node)
             }}
+            title="Выделить/снять выделение"
           />
         )}
-        <span className={'dot ' + getDotClass()} title={effectiveOpen ? 'Свернуть' : 'Развернуть'} />
+        <span 
+          className={'dot ' + getDotClass()} 
+          title={effectiveOpen ? 'Свернуть' : 'Развернуть'}
+          onClick={selectionMode ? handleRowClick : undefined}
+        />
         {isLink ? (
           <span className="link-wrap">
             {(() => {
@@ -479,12 +509,32 @@ const NodeView: React.FC<{
                 <img className="favicon" src={src} onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden'}} alt=""/>
               ) : <span style={{ width: 16, height: 16 }} />
             })()}
-            <a className="link link-text" href={node.url} target="_blank" rel="noreferrer">
+            <a 
+              className="link link-text" 
+              href={node.url} 
+              target="_blank" 
+              rel="noreferrer"
+              onMouseEnter={handleLinkMouseEnter}
+              onMouseLeave={handleLinkMouseLeave}
+              onClick={selectionMode ? (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onToggleNodeSelection?.(node)
+              } : undefined}
+            >
               <TitleWithHighlight text={node.title} q={q} isLink />
             </a>
           </span>
         ) : (
-          <span className="node-title"><TitleWithHighlight text={node.title} q={q} /></span>
+          <span 
+            className="node-title"
+            onClick={selectionMode ? (e) => {
+              e.stopPropagation()
+              onToggleNodeSelection?.(node)
+            } : undefined}
+          >
+            <TitleWithHighlight text={node.title} q={q} />
+          </span>
         )}
         <div className="node-actions">
           {/* Всегда показываем кнопку открытия для ссылок */}
@@ -533,6 +583,27 @@ const NodeView: React.FC<{
               globalIsNodeSelected={globalIsNodeSelected}
             />
           ))}
+        </div>
+      )}
+
+      {/* Компонент предпросмотра страницы */}
+      {isVisible && previewUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            left: position.x,
+            top: position.y,
+            zIndex: 1000,
+            pointerEvents: 'none'
+          }}
+        >
+          <PagePreview
+            url={previewUrl}
+            title={previewTitle || ''}
+            width={320}
+            height={200}
+            onClose={hidePreview}
+          />
         </div>
       )}
     </div>

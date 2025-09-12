@@ -1,10 +1,24 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.5.5-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.6.0-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
 A powerful Chrome extension for managing bookmarks in a visual tree structure with local SQLite storage and offline page saving capabilities.
+
+## 🆕 New in Version 0.1.6.0
+
+### 👁️ Page Preview
+- **Mini preview window** appears on link hover
+- **Smart positioning** to avoid screen edges
+- **Configurable delay** (800ms) to prevent accidental triggers
+- **Error handling** with fallback interface when preview fails
+
+### ✅ Enhanced Selection Mode
+- **Precise selection control** - only via checkboxes and selection icons
+- **Preserved functionality** - link opening and tree navigation work normally
+- **Improved UI** with animations and visual indicators
+- **Group operations** for selected items
 
 ## 🌟 Features
 
