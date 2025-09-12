@@ -339,9 +339,15 @@ describe('useTags Hook', () => {
       storageKey: 'test-tags'
     }));
     
+    let tagId: string;
+    
     act(() => {
-      result.current.createTag('New Tag');
-      result.current.addTagToNode(result.current.tags[0].id, 'node1', 'tree1');
+      const newTag = result.current.createTag('New Tag');
+      tagId = newTag.id;
+    });
+    
+    act(() => {
+      result.current.addTagToNode(tagId, 'node1', 'tree1');
     });
     
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
