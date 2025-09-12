@@ -1,403 +1,69 @@
-:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;--bg:#fff; --fg:#222; --muted:#777; --border:#e5e5e5; --accent:#0b74de; --chip:#f3f3f3;}
-/* ручной выбор темы через data-theme на body */
-body[data-theme="light"]{
-  --bg:#fff; --fg:#222; --muted:#777; --border:#e5e5e5; --accent:#0b74de; --chip:#f3f3f3;
-}
-body[data-theme="dark"]{
-  --bg:#15171a; --fg:#e9e9e9; --muted:#a0a0a0; --border:#2a2d31; --accent:#4da3ff; --chip:#23262a;
-}
-/* системная тема (когда атрибута нет) */
-@media (prefers-color-scheme: dark){
-  body:not([data-theme]) {
-    --bg:#15171a; --fg:#e9e9e9; --muted:#a0a0a0; --border:#2a2d31; --accent:#4da3ff; --chip:#23262a;
-  }
-}
-html,body,#root{margin:0;padding:0}
-body{background:var(--bg);color:var(--fg)}
-body.popup{width:360px;height:540px;overflow:hidden}
-.app{display:flex;flex-direction:column;height:100vh;min-height:540px}
-.topbar { display:flex; gap:.5rem; align-items:center; overflow-x:auto; flex-shrink:0; background: var(--bg); border-bottom:1px solid var(--border); padding:8px; }
-.topitem { padding:.25rem .5rem; border-radius:.5rem; background:var(--bg-2); cursor:pointer; white-space:nowrap; position:relative; }
-.topitem.active { background:var(--bg-3); font-weight:600; }
-.top-actions { margin-left:.4rem; display:inline-flex; gap:.25rem; }
-.topbar .add{margin-left:auto;border:0;background:var(--accent);color:#fff;border-radius:12px;padding:6px 10px;cursor:pointer;flex:0 0 auto}
-.topbar button, .topbar select{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 8px;flex:0 0 auto}
-.main{padding:8px;overflow:auto;display:grid;grid-template-columns:1fr;gap:16px;flex:1;min-height:0}
-@media (min-width: 900px){ .main{grid-template-columns:1.4fr 0.6fr} }
-.card{border:1px solid var(--border);border-radius:12px;padding:10px}
-.row{display:flex;gap:8px;align-items:center}
-input[type='text'],select{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg)}
-button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg);cursor:pointer}
-.muted{color:var(--muted);font-size:12px}
-.tree{padding:8px;overflow:auto;height:100%}
-.tree-actions{
-  display:flex;
-  gap:8px;
-  margin-bottom:8px;
-  border-bottom:1px dashed var(--border);
-  padding-bottom:8px;
-  align-items:center;         /* важно: вертикальное выравнивание */
-  position: relative; 
-  z-index: 2;
-}
-.node{margin-left:8px}
-.node-row{position:relative;display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:8px}
-.node-row:hover{background:color-mix(in oklab,var(--accent) 8%,transparent)}
-.children{position:relative;margin-left:16px;padding-left:16px}
-.children::before{content:'';position:absolute;left:7px;top:0;bottom:0;border-left:1px solid var(--border)}
-.node-row::before{content:'';position:absolute;left:-9px;top:12px;width:9px;border-top:1px solid var(--border)}
-.node .children{transition:opacity 120ms ease,transform 120ms ease}
-.node-row[aria-expanded='false'] + .children{opacity:0;transform:translateY(-4px)}
-.dot{width:8px;height:8px;border-radius:50%}
-.dot.folder{background:#888}.dot.link{background:var(--accent)}
-/* Новый стиль для ссылок с дочерними элементами */
-.dot.link-parent {
-  background: var(--bg);
-  border: 2px solid var(--accent);
-}
-.node-actions{margin-left:auto;display:flex;gap:6px}
-.icon-btn { background:transparent; border:none; cursor:pointer; }
+/* Add this at the end of the existing CSS file */
 
-/* Фиксированная ширина для всех кнопок действий, чтобы обеспечить выравнивание */
-.node-actions .icon-btn {
-  min-width: 36px;
-  text-align: center;
-  padding: 0 2px;
+/* Link Preview Functionality */
+.link-preview-container {
+  position: fixed;
+  z-index: 1000;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  padding: 0;
+  overflow: hidden;
+  max-width: 80vw;
+  max-height: 80vh;
+  display: none;
+  pointer-events: none;
 }
 
-.favicon{width:16px;height:16px;border-radius:3px;flex:0 0 16px}
-.link-wrap{display:flex;align-items:center;gap:6px;min-width:0}
-.link-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-/* Стиль для узлов с комментариями */
-.node-row.has-comment {
-  /* Убираем border-left и padding-left, которые могут вызывать визуальные артефакты */
-  /* Вместо этого используем более мягкий визуальный индикатор */
-  background: linear-gradient(to right, color-mix(in oklab, var(--accent) 20%, transparent) 0%, transparent 100%);
+.link-preview-container.visible {
+  display: block;
 }
 
-/* Стиль для кнопки комментария с активным комментарием */
-.icon-btn.comment-active {
-  color: var(--accent);
-  font-weight: bold;
+.link-preview-iframe {
+  width: 400px;
+  height: 300px;
+  border: none;
+  transform-origin: 0 0;
+  transform: scale(0.8);
 }
 
-/* Стили для выделенных узлов */
-.node-row.selected {
-  background: color-mix(in oklab, var(--accent) 20%, transparent) !important;
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
-  border-radius: 6px;
-  padding: 4px 6px;
-}
-
-.footer{
-  flex-shrink:0;
-  background: var(--bg);
-  border-top:1px solid var(--border);
-  padding: 8px 12px;
-  display:flex;
-  justify-content: space-between;
-  align-items:center;
-}
-.footer button{ padding:6px 10px; }
-.levels .level-btn{
-  padding: 4px 8px;
-  border:1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-  cursor: pointer;
-  flex: 0 0 auto;             /* фиксированный размер кнопок */
-}
-.levels .level-btn.active{
-  background: color-mix(in oklab, var(--accent) 12%, transparent);
-  border-color: var(--accent);
-  font-weight: 600;
-}
-/* ----- панель уровней ----- */
-.levelbar {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  margin-left: 8px;
-  flex-wrap: wrap;
-}
-.levelbar .chip {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--fg);
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.levelbar .chip.active {
-  background: color-mix(in oklab, var(--accent) 18%, transparent);
-  border-color: var(--accent);
-}
-
-/* ===== СТИЛИ ДЛЯ СИСТЕМЫ ВЫДЕЛЕНИЯ ===== */
-
-/* Индикатор выделения */
-.selection-indicator {
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  padding: 8px;
-  margin: 0 -8px 8px -8px; /* растягиваем на всю ширину */
-}
-
-.selection-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.selection-mode-btn {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  transition: all 0.2s ease;
-}
-
-.selection-mode-btn:hover {
-  background: color-mix(in oklab, var(--accent) 8%, transparent);
-}
-
-.selection-mode-btn.active {
-  background: color-mix(in oklab, var(--accent) 15%, transparent);
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.selection-icon {
-  font-size: 14px;
-}
-
-.selection-count {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: color-mix(in oklab, var(--accent) 10%, transparent);
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.count-badge {
-  background: var(--accent);
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
+.link-preview-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
+  width: 400px;
+  height: 300px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
 }
 
-.count-text {
-  color: var(--fg);
-  font-weight: 500;
-}
-
-.clear-selection-btn {
-  padding: 4px 8px;
-  border: 1px solid #dc3545;
-  border-radius: 6px;
-  background: transparent;
-  color: #dc3545;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s ease;
-}
-
-.clear-selection-btn:hover {
-  background: #dc3545;
-  color: white;
-}
-
-/* Group operations styling */
-.group-operations {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.group-operation-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.link-preview-error {
   display: flex;
   align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+  justify-content: center;
+  width: 400px;
+  height: 300px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+  padding: 20px;
+  text-align: center;
 }
 
-.group-operation-btn.delete-btn {
-  background: #ff4757;
-  color: white;
-}
-
-.group-operation-btn.delete-btn:hover {
-  background: #ff3838;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
-}
-
-.group-operation-btn.move-btn {
-  background: #3742fa;
-  color: white;
-}
-
-.group-operation-btn.move-btn:hover {
-  background: #2f3542;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(55, 66, 250, 0.3);
-}
-
-.group-operation-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Dark theme adjustments for group operations */
-[data-theme='dark'] .group-operation-btn.delete-btn {
-  background: #e74c3c;
-}
-
-[data-theme='dark'] .group-operation-btn.delete-btn:hover {
-  background: #c0392b;
-}
-
-[data-theme='dark'] .group-operation-btn.move-btn {
-  background: #3498db;
-}
-
-[data-theme='dark'] .group-operation-btn.move-btn:hover {
-  background: #2980b9;
-}
-
-/* Styling for the universal selected-to-root button */
-.selected-to-root-btn {
-  background: #17a2b8 !important;
-  color: white !important;
-  border: none !important;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.selected-to-root-btn:hover {
-  background: #138496 !important;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(23, 162, 184, 0.3);
-}
-
-.selected-to-root-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Dark theme adjustments for selected-to-root button */
-[data-theme='dark'] .selected-to-root-btn {
-  background: #20c997 !important;
-}
-
-[data-theme='dark'] .selected-to-root-btn:hover {
-  background: #1aa179 !important;
-}
-
-.selection-hint {
-  margin-top: 6px;
-  padding: 4px 8px;
-  background: color-mix(in oklab, var(--muted) 10%, transparent);
-  border-radius: 6px;
-  border-left: 3px solid var(--muted);
-}
-
-.hint-text {
-  color: var(--muted);
-  font-size: 12px;
-  font-style: italic;
-}
-
-/* Стили для выделенных узлов */
-.node-row.selected {
-  background: color-mix(in oklab, var(--accent) 20%, transparent) !important;
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
-  border-radius: 6px;
-  padding: 4px 6px;
-}
-
-.node-row.selected .node-title,
-.node-row.selected .link-text {
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.node-row.selected .dot {
-  border: 2px solid var(--accent);
-  background: var(--bg);
-}
-
-/* Checkbox для выделения в режиме выделения */
-.selection-checkbox {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-radius: 3px;
-  background: var(--bg);
-  cursor: pointer;
+/* Vertical line indicator for preview */
+.link-wrap {
   position: relative;
-  transition: all 0.2s ease;
-  margin-right: 4px;
 }
 
-.selection-checkbox:hover {
-  border-color: var(--accent);
-}
-
-.selection-checkbox.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.selection-checkbox.checked::after {
-  content: '✓';
+.link-wrap:hover::before {
+  content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-/* Анимация для режима выделения */
-.tree.selection-mode .node-row {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tree.selection-mode .node-row:hover {
-  background: color-mix(in oklab, var(--accent) 12%, transparent);
-  transform: translateX(2px);
+  left: -8px;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background-color: var(--accent);
+  border-radius: 2px;
 }

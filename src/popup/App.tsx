@@ -23,6 +23,7 @@ import Tree from "./Tree";
 import { useTreeStates } from "./useTreeStates";
 import { useSelection } from "./useSelection";
 import SelectionIndicator from "./SelectionIndicator";
+import LinkPreview from "./LinkPreview";
 
 type SimpleTab = {
   id: number;
@@ -39,6 +40,10 @@ export default function App() {
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [forceExpand, setForceExpand] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  
+  // Link preview state
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Хук для управления состояниями деревьев
   const { getState, updateState, removeState } = useTreeStates();
@@ -200,6 +205,8 @@ export default function App() {
     const onVis = () => { if (!document.hidden) refreshTabsAndSelect(); };
     document.addEventListener("visibilitychange", onVis);
 
+    refreshTabsAndSelect();
+
     return () => {
       chrome.tabs.onActivated.removeListener(onActivated);
       chrome.tabs.onUpdated.removeListener(onUpdated as any);
@@ -208,240 +215,190 @@ export default function App() {
     };
   }, [isPanel]);
 
-  function applyThemeToDOM(mode: ThemeMode) {
-    const el = document.body;
-    el.removeAttribute("data-theme");
-    if (mode === "light" || mode === "dark")
-      el.setAttribute("data-theme", mode);
-  }
-  async function changeTheme(next: ThemeMode) {
-    setThemeState(next);
-    await setTheme(next);
-    applyThemeToDOM(next);
-  }
-
-  const active = useMemo(
-    () => trees.find((t) => t.id === activeId) || null,
-    [trees, activeId]
-  );
-
-  /** Коммит узлов для конкретного дерева: пишем в БД и синхронизируем локальное состояние */
-  const updateNodesFor = async (docId: string, nodes: TreeNode[]) => {
-    const saved = await upsertNodes(docId, nodes);
-    if (!saved) return;
-    setTrees((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-  };
-
-  // Пришёл список выделенных вкладок из background — добавляем пачкой в активное дерево
-  useEffect(() => {
-    function onMsg(msg: any) {
-      if (msg?.type === 'VB_ADD_SELECTED_TABS' && active) {
-        const nodes: TreeNode[] = (msg.tabs || []).map((t: { title: string; url: string }) => ({
-          id: crypto.randomUUID(),
-          title: t.title || t.url,
-          url: t.url,
-          children: []
-        }));
-        if (nodes.length) {
-          updateNodesFor(active.id, [...nodes, ...active.nodes]);
-        }
-      }
+  // Применение темы к DOM
+  function applyThemeToDOM(theme: ThemeMode) {
+    if (theme === "system") {
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    } else {
+      document.documentElement.setAttribute("data-theme", theme);
     }
-    chrome.runtime.onMessage.addListener(onMsg);
-    return () => chrome.runtime.onMessage.removeListener(onMsg);
-  }, [active]);
+  }
 
-  const onCreate = async () => {
-    const name = prompt("Название дерева")?.trim();
-    if (!name) return;
-    const doc = await createTree(name);
-    setTrees([doc, ...trees]);
-    setActiveId(doc.id);
+  // Обработчик изменения темы
+  const handleThemeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newTheme = e.target.value as ThemeMode;
+    setThemeState(newTheme);
+    applyThemeToDOM(newTheme);
+    await setTheme(newTheme);
   };
 
-  const onRename = async () => {
-    if (!activeId) return;
-    const name = (title || prompt("Новое название")?.trim() || "").trim();
+  // Обработчик создания нового дерева
+  const handleCreateTree = async () => {
+    const name = prompt("Название дерева:");
     if (!name) return;
-    const updated = await renameTree(activeId, name);
-    if (!updated) return;
-    setTrees(trees.map((t) => (t.id === activeId ? updated! : t)));
-    setTitle("");
+    const newTree = await createTree(name);
+    setTrees((prev) => [...prev, newTree]);
+    setActiveId(newTree.id);
   };
 
-  const onDelete = async () => {
+  // Обработчик переименования дерева
+  const handleRenameTree = async () => {
     if (!activeId) return;
-    if (!confirm("Удалить активное дерево? Это действие нельзя отменить.")) return;
+    const tree = trees.find((t) => t.id === activeId);
+    if (!tree) return;
+
+    const name = prompt("Новое название дерева:", tree.title);
+    if (!name || name === tree.title) return;
+
+    await renameTree(activeId, name);
+    setTrees((prev) =>
+      prev.map((t) => (t.id === activeId ? { ...t, title: name } : t))
+    );
+  };
+
+  // Обработчик удаления дерева
+  const handleDeleteTree = async () => {
+    if (!activeId) return;
+    const tree = trees.find((t) => t.id === activeId);
+    if (!tree) return;
+
+    if (!confirm(`Удалить дерево "${tree.title}"?`)) return;
+
     await deleteTree(activeId);
-    removeState(activeId); // Очищаем состояние UI
-    const next = trees.filter((t) => t.id !== activeId);
-    setTrees(next);
-    setActiveId(next[0]?.id ?? null);
+    removeState(activeId);
+    setTrees((prev) => prev.filter((t) => t.id !== activeId));
+    setActiveId(trees.find((t) => t.id !== activeId)?.id ?? null);
   };
 
-  const onExport = async () => {
-    const data = await exportJSON();
-    const blob = new Blob([data], { type: "application/json" });
+  // Обработчик экспорта в JSON
+  const handleExport = async () => {
+    if (!activeId) return;
+    const tree = trees.find((t) => t.id === activeId);
+    if (!tree) return;
+
+    const json = await exportJSON(activeId);
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const filename = `visual-bookmarks-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    await chrome.downloads.download({ url, filename, saveAs: true });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tree.title.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  const onImport = async (ev: React.ChangeEvent<HTMLInputElement>) => {
-    const file = ev.target.files?.[0];
+  // Обработчик импорта из JSON
+  const handleImport = () => {
+    if (!fileRef.current) return;
+    fileRef.current.click();
+  };
+
+  // Обработчик выбора файла для импорта
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    try {
-      const state = await importJSON(text);
-      setTrees(state.trees);
-      setActiveId(state.trees[0]?.id ?? null);
-      alert("Импорт успешно завершён");
-    } catch (e: any) {
-      alert("Ошибка импорта: " + e.message);
-    } finally {
-      ev.target.value = "";
-    }
-  };
 
-  // Групповое удаление выделенных элементов
-  const handleDeleteSelected = async () => {
-    if (!active) return;
-    const selectedIds = getSelectedNodeIds(active.id);
-    if (selectedIds.length === 0) return;
-    
-    const confirmMessage = `Удалить ${selectedIds.length} выделенных элементов? Это действие нельзя отменить.`;
-    if (!confirm(confirmMessage)) return;
-    
     try {
-      // Удаляем узлы из дерева
-      const newNodes = removeMultipleNodes(active.nodes, selectedIds);
-      await updateNodesFor(active.id, newNodes);
-      
-      // Очищаем выделение
-      removeNodesFromSelection(active.id, selectedIds);
-      
-      lock(600);
+      const text = await file.text();
+      const newTree = await importJSON(text);
+      setTrees((prev) => [...prev, newTree]);
+      setActiveId(newTree.id);
     } catch (error) {
-      console.error('Error deleting selected nodes:', error);
-      alert('Ошибка при удалении элементов');
+      console.error("Import error:", error);
+      alert("Ошибка импорта: " + (error as Error).message);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
-  // Групповое перемещение выделенных элементов
-  const handleMoveSelected = async () => {
-    if (!active) return;
-    const selectedIds = getSelectedNodeIds(active.id);
-    if (selectedIds.length === 0) return;
+  // Обработчик открытия панели
+  const handleOpenPanel = () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("panel.html") });
+  };
+
+  // Активное дерево
+  const active = trees.find((t) => t.id === activeId);
+
+  // Обработчик добавления категории в корень
+  const handleAddRootCategory = async () => {
+    if (!activeId) return;
+    const title = prompt("Название категории:");
+    if (!title) return;
+
+    const tree = trees.find((t) => t.id === activeId);
+    if (!tree) return;
+
+    const newNode: TreeNode = {
+      id: crypto.randomUUID(),
+      title,
+      children: [],
+    };
+
+    const newNodes = [...tree.nodes, newNode];
+    await updateNodesFor(activeId, newNodes);
+  };
+
+  // Обработчик добавления текущей вкладки в корень
+  const handleAddCurrentTabToRoot = async () => {
+    if (!activeId || !selTab) return;
+    const tree = trees.find((t) => t.id === activeId);
+    if (!tree) return;
+
+    const newNode: TreeNode = {
+      id: crypto.randomUUID(),
+      title: selTab.title || selTab.url || "Без названия",
+      url: selTab.url,
+      children: [],
+    };
+
+    const newNodes = [...tree.nodes, newNode];
+    await updateNodesFor(activeId, newNodes);
+  };
+
+  // Обновление узлов дерева
+  const updateNodesFor = async (treeId: string, nodes: TreeNode[]) => {
+    await upsertNodes(treeId, nodes);
+    setTrees((prev) =>
+      prev.map((t) => (t.id === treeId ? { ...t, nodes } : t))
+    );
+  };
+
+  // Обработчик удаления выделенных элементов
+  const handleDeleteSelected = async () => {
+    if (!activeId) return;
     
-    // Получаем список доступных целей для перемещения
-    const targets: Array<{label: string, value: string | null, treeId: string}> = [];
+    // Получаем все выделенные элементы
+    const selectedNodes = getAllSelectedNodes();
+    if (selectedNodes.length === 0) return;
     
-    // Добавляем корни всех деревьев
-    trees.forEach(tree => {
-      targets.push({
-        label: `[Корень] ${tree.title}`,
-        value: null,
-        treeId: tree.id
-      });
+    // Группируем по деревьям
+    const nodesByTree: Record<string, string[]> = {};
+    selectedNodes.forEach(node => {
+      if (!nodesByTree[node.treeId]) {
+        nodesByTree[node.treeId] = [];
+      }
+      nodesByTree[node.treeId].push(node.nodeId);
     });
     
-    // Рекурсивно добавляем папки (не ссылки) из активного дерева
-    const addFolders = (nodes: TreeNode[], prefix = '') => {
-      nodes.forEach(node => {
-        if (!node.url && !selectedIds.includes(node.id)) { // Только папки, не выделенные
-          targets.push({
-            label: `${prefix}${node.title}`,
-            value: node.id,
-            treeId: active.id
-          });
-          if (node.children) {
-            addFolders(node.children, `${prefix}${node.title} / `);
-          }
-        }
-      });
-    };
+    // Подтверждение удаления
+    const totalCount = selectedNodes.length;
+    const confirmMessage = `Удалить ${totalCount} выделенных элементов?`;
+    if (!confirm(confirmMessage)) return;
     
-    addFolders(active.nodes);
-    
-    // Показываем диалог выбора
-    const targetOptions = targets.map((t, i) => `${i + 1}. ${t.label}`).join('\n');
-    const choice = prompt(
-      `Переместить ${selectedIds.length} элементов в:\n\n${targetOptions}\n\nВведите номер:`,
-      '1'
-    );
-    
-    if (!choice) return;
-    
-    const targetIndex = parseInt(choice) - 1;
-    if (isNaN(targetIndex) || targetIndex < 0 || targetIndex >= targets.length) {
-      alert('Неверный номер');
-      return;
-    }
-    
-    const target = targets[targetIndex];
-    
-    try {
-      if (target.treeId === active.id) {
-        // Перемещение в пределах текущего дерева
-        const newNodes = moveMultipleNodes(active.nodes, selectedIds, target.value);
-        await updateNodesFor(active.id, newNodes);
-      } else {
-        // Перемещение в другое дерево
-        const targetTree = trees.find(t => t.id === target.treeId);
-        if (!targetTree) {
-          alert('Целевое дерево не найдено');
-          return;
-        }
-        
-        // Извлекаем узлы из текущего дерева
-        const newSourceNodes = removeMultipleNodes(active.nodes, selectedIds);
-        
-        // Получаем сами узлы для перемещения
-        const nodesToMove: TreeNode[] = [];
-        const findNodes = (nodes: TreeNode[]) => {
-          nodes.forEach(node => {
-            if (selectedIds.includes(node.id)) {
-              nodesToMove.push(node);
-            }
-            if (node.children) {
-              findNodes(node.children);
-            }
-          });
-        };
-        findNodes(active.nodes);
-        
-        // Добавляем в целевое дерево
-        let newTargetNodes = targetTree.nodes;
-        if (target.value === null) {
-          // В корень
-          newTargetNodes = [...nodesToMove, ...targetTree.nodes];
-        } else {
-          // В конкретную папку
-          newTargetNodes = moveMultipleNodes(targetTree.nodes, nodesToMove.map(n => n.id), target.value);
-        }
-        
-        // Обновляем оба дерева
-        await updateNodesFor(active.id, newSourceNodes);
-        await updateNodesFor(target.treeId, newTargetNodes);
-      }
+    // Удаляем из каждого дерева
+    for (const [treeId, nodeIds] of Object.entries(nodesByTree)) {
+      const tree = trees.find(t => t.id === treeId);
+      if (!tree) continue;
       
-      // Очищаем выделение
-      removeNodesFromSelection(active.id, selectedIds);
+      const updatedNodes = removeMultipleNodes(tree.nodes, nodeIds);
+      await updateNodesFor(treeId, updatedNodes);
       
-      lock(600);
-    } catch (error) {
-      console.error('Error moving selected nodes:', error);
-      alert('Ошибка при перемещении элементов');
+      // Удаляем из выделения
+      removeNodesFromSelection(treeId, nodeIds);
     }
   };
 
-  function faviconFor(tab: SimpleTab) {
-    if (tab.favIconUrl && /^https?:/i.test(tab.favIconUrl)) return tab.favIconUrl;
-    if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) return "";
-    return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(tab.url)}&sz=16`;
-  }
-
+  // Обработчик для активации дерева при наведении
   const scheduleActivate = (id: string) => {
     if (!canHover) return;
     if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
@@ -453,12 +410,18 @@ export default function App() {
   };
   const cancelHover = () => {
     if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
-    hoverTimer.current = null;
-    setForceExpand(false);
   };
 
-  const fmtTime = (ms: number | null) =>
-    ms ? new Date(ms).toLocaleTimeString() : "—";
+  // Handle link preview
+  const handleLinkHover = (url: string | null, x: number, y: number) => {
+    if (url) {
+      setPreviewUrl(url);
+      setPreviewPosition({ x, y });
+    } else {
+      setPreviewUrl(null);
+      setPreviewPosition(null);
+    }
+  };
 
   return (
     <div className="app">
@@ -479,27 +442,31 @@ export default function App() {
             {t.title}
             {t.id === activeId && (
               <span className="top-actions">
-                <button className="icon-btn" title="Переименовать" onClick={() => { lock(600); onRename(); }}>✏</button>
-                <button className="icon-btn" title="Удалить дерево" onClick={() => { lock(600); onDelete(); }}>🗑</button>
+                <button className="icon-btn" title="Переименовать" onClick={() => { lock(600); handleRenameTree(); }}>✏</button>
+                <button className="icon-btn" title="Удалить дерево" onClick={() => { lock(600); handleDeleteTree(); }}>🗑</button>
               </span>
             )}
           </div>
         ))}
-        <button className="add" onClick={() => { lock(400); onCreate(); }} title="Новое дерево">＋</button>
         <button
-          onClick={() => {
-            const url = chrome.runtime.getURL("panel.html");
-            chrome.tabs.create({ url });
-          }}
-          title="Открыть большое окно"
+          className="topitem add"
+          onClick={() => { lock(600); handleCreateTree(); }}
+          title="Создать новое дерево"
+        >
+          +
+        </button>
+        <button
+          className="topitem panel"
+          onClick={() => { lock(600); handleOpenPanel(); }}
+          title="Открыть в панели"
         >
           ⛶
         </button>
         <select
+          className="theme-select"
           value={theme}
-          onChange={(e) => changeTheme(e.target.value as ThemeMode)}
-          title="Тема"
-          style={{ marginLeft: "8px" }}
+          onChange={handleThemeChange}
+          title="Выбор темы"
         >
           <option value="system">Системная</option>
           <option value="light">Светлая</option>
@@ -522,254 +489,104 @@ export default function App() {
               />
               <Tree
                 doc={active}
-                selectedTab={selTab}
-                // Tree просит App зафиксировать узлы (синхронизация состояния trees)
-                onCommitNodes={async (docId, nodes) => {
-                  await updateNodesFor(docId, nodes);
-                }}
-                onAddRootCategory={async () => {
-                  if (!active) return;
-                  lock(600);
-                  const name = prompt("Название категории")?.trim();
-                  if (!name) return;
-                  const node: TreeNode = { id: crypto.randomUUID(), title: name, children: [] };
-                  await updateNodesFor(active.id, [node, ...active.nodes]);
-                }}
-                onAddCurrentTabToRoot={async () => {
-                  try {
-                    if (!active) return;
-                    lock(600);
-                    
-                    // Получаем выделенные закладки для проверки
-                    let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
-                    
-                    if (selectionState.selectionMode) {
-                      // Получаем выделенные узлы (ссылки и папки)
-                      const allSelected = getAllSelectedNodes()
-                      selectedNodes = allSelected.map((item: any) => ({
-                        treeId: item.treeId,
-                        nodeId: item.nodeId,
-                        title: item.title,
-                        url: item.url
-                      }))
-                    }
-                    
-                    // Получаем элементы для добавления по приоритету
-                    const itemsToAdd = await getUniversalItemsToAdd({
-                      selectedNodes,
-                      selectedTab: selTab,
-                      sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes }))
-                    })
-                    
-                    if (itemsToAdd.length === 0) {
-                      alert('Нет элементов для добавления. Выберите вкладку выше.')
-                      return
-                    }
-                    
-                    // Определяем источник для обработки
-                    const source = itemsToAdd[0].source
-                    
-                    if (source === 'selection') {
-                      // Используем простое копирование
-                      try {
-                        const copiedNodes = await copySelectedNodes({
-                          selectedNodes,
-                          sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes })),
-                          moveMode: selectionState.moveMode,
-                          onUpdateTree: updateNodesFor,
-                          targetTreeId: active.id // Для определения внутридерева перемещений
-                        })
-                        
-                        if (copiedNodes.length > 0) {
-                          await updateNodesFor(active.id, [...copiedNodes, ...active.nodes])
-                          
-                          // Очищаем выделение
-                          selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
-                          
-                          console.log(`Успешно ${selectionState.moveMode ? 'перемещено' : 'скопировано'} в корень: ${copiedNodes.length} элементов`)
-                        } else {
-                          alert('Не удалось скопировать выделенные элементы')
-                        }
-                      } catch (error) {
-                        console.error('Error copying to root:', error)
-                        alert('Ошибка при копировании: ' + (error as Error).message)
-                      }
-                    } else {
-                      // Добавляем новые узлы в корень
-                      const newNodes = itemsToAdd.map(universalItemToTreeNode)
-                      await updateNodesFor(active.id, [...newNodes, ...active.nodes])
-                    }
-                    
-                    // Показываем уведомление о результате
-                    const description = getSourceDescription(source, itemsToAdd.length)
-                    console.log(`Успешно ${source === 'selection' ? (selectionState.moveMode ? 'перемещено' : 'скопировано') : 'добавлено'} в корень: ${description}`)
-                    
-                  } catch (error) {
-                    console.error('Error in onAddCurrentTabToRoot:', error)
-                    alert('Ошибка при добавлении элементов: ' + (error as Error).message)
-                  }
-                }}
-
+                onAddRootCategory={handleAddRootCategory}
+                onAddCurrentTabToRoot={handleAddCurrentTabToRoot}
                 forceExpand={forceExpand}
+                selectedTab={selTab}
+                onCommitNodes={updateNodesFor}
                 uiState={getState(active.id)}
                 onUpdateUIState={(updater) => updateState(active.id, updater)}
-                // Новые пропсы для системы выделения
                 selectionMode={selectionState.selectionMode}
                 moveMode={selectionState.moveMode}
-                isNodeSelected={(nodeId: string) => isNodeSelected(active.id, nodeId)}
-                onToggleNodeSelection={(node: TreeNode) => toggleNodeSelection(active.id, node)}
+                isNodeSelected={(nodeId) => isNodeSelected(active.id, nodeId)}
+                onToggleNodeSelection={(node) => toggleNodeSelection(active.id, node)}
                 onDeleteSelected={handleDeleteSelected}
                 removeNodesFromSelection={removeNodesFromSelection}
-                // Параметры для универсального переноса
                 allTrees={trees}
                 onUpdateTreeNodes={updateNodesFor}
                 globalIsNodeSelected={isNodeSelected}
+                onLinkHover={handleLinkHover}
               />
             </>
           ) : (
-            <div className="muted">Создайте первое дерево</div>
+            <div className="empty-state">
+              <p>Нет деревьев. Создайте новое дерево.</p>
+              <button onClick={handleCreateTree}>Создать дерево</button>
+            </div>
           )}
         </div>
 
-        <div className="card">
-          <strong>Какая вкладка будет добавлена?</strong>
-          <div className="row" style={{ marginTop: 8 }}>
-            <select value={selId ?? ""} onChange={(e) => setSelId(Number(e.target.value))}>
+        {isPanel && (
+          <div className="right-panel">
+            <div className="tabs-list">
+              <div className="tabs-header">Вкладки</div>
               {tabs.map((t) => (
-                <option key={t.id} value={t.id}>{t.title.slice(0, 80)}</option>
-              ))}
-            </select>
-          </div>
-
-          {selTab && (
-            <>
-              <div className="row" style={{ marginTop: 8 }}>
-                {(() => {
-                  const src = faviconFor(selTab);
-                  return src ? (
-                    <img className="favicon" src={src}
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
-                      alt="" />
-                  ) : <span style={{ width: 16, height: 16 }} />;
-                })()}
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={selTab.url}>
-                  {selTab.title}
+                <div
+                  key={t.id}
+                  className={"tab-item" + (t.id === selId ? " selected" : "")}
+                  onClick={() => setSelId(t.id)}
+                  title={t.title}
+                >
+                  <img
+                    className="tab-favicon"
+                    src={
+                      t.favIconUrl && /^https?:/i.test(t.favIconUrl)
+                        ? t.favIconUrl
+                        : `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(
+                            t.url
+                          )}&sz=16`
+                    }
+                    alt=""
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.visibility = "hidden";
+                    }}
+                  />
+                  <span className="tab-title">{t.title}</span>
                 </div>
-              </div>
-
-              <div className="row" style={{ marginTop: 8, gap: 8 }}>
-                <button onClick={() => chrome.tabs.update(selTab.id, { active: true })}>Перейти к вкладке</button>
-                <button onClick={async () => {
-                  try {
-                    if (!active) return;
-                    lock(600);
-                    
-                    // Получаем выделенные закладки для проверки
-                    let selectedNodes: Array<{ treeId: string, nodeId: string, title: string, url?: string }> = []
-                    
-                    if (selectionState.selectionMode) {
-                      // Получаем выделенные узлы (ссылки и папки)
-                      const allSelected = getAllSelectedNodes()
-                      selectedNodes = allSelected.map((item: any) => ({
-                        treeId: item.treeId,
-                        nodeId: item.nodeId,
-                        title: item.title,
-                        url: item.url
-                      }))
-                    }
-                    
-                    // Получаем элементы для добавления по приоритету
-                    const itemsToAdd = await getUniversalItemsToAdd({
-                      selectedNodes,
-                      selectedTab: selTab,
-                      sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes }))
-                    })
-                    
-                    if (itemsToAdd.length === 0) {
-                      alert('Нет элементов для добавления. Выберите вкладку выше.')
-                      return
-                    }
-                    
-                    // Определяем источник для обработки
-                    const source = itemsToAdd[0].source
-                    
-                    if (source === 'selection') {
-                      // Используем простое копирование
-                      try {
-                        const copiedNodes = await copySelectedNodes({
-                          selectedNodes,
-                          sourceTreeData: trees.map(t => ({ treeId: t.id, nodes: t.nodes })),
-                          moveMode: selectionState.moveMode,
-                          onUpdateTree: updateNodesFor
-                        })
-                        
-                        if (copiedNodes.length > 0) {
-                          await updateNodesFor(active.id, [...copiedNodes, ...active.nodes])
-                          
-                          // Очищаем выделение
-                          selectedNodes.forEach(n => removeNodesFromSelection(n.treeId, [n.nodeId]))
-                          
-                          console.log(`Успешно ${selectionState.moveMode ? 'перемещено' : 'скопировано'} в корень: ${copiedNodes.length} элементов`)
-                        } else {
-                          alert('Не удалось скопировать выделенные элементы')
-                        }
-                      } catch (error) {
-                        console.error('Error copying to root:', error)
-                        alert('Ошибка при копировании: ' + (error as Error).message)
-                      }
-                    } else {
-                      // Добавляем новые узлы в корень
-                      const newNodes = itemsToAdd.map(universalItemToTreeNode)
-                      await updateNodesFor(active.id, [...newNodes, ...active.nodes])
-                    }
-                    
-                    // Показываем уведомление о результате
-                    const description = getSourceDescription(source, itemsToAdd.length)
-                    console.log(`Успешно ${source === 'selection' ? (selectionState.moveMode ? 'перемещено' : 'скопировано') : 'добавлено'} в корень: ${description}`)
-                    
-                  } catch (error) {
-                    console.error('Error in + В корень button:', error)
-                    alert('Ошибка при добавлении элементов: ' + (error as Error).message)
-                  }
-                }}>+ В корень</button>
-                <button onClick={async () => {
-                  if (!selTab || !active) return;
-                  lock(1000);
-                  const res = await chrome.runtime.sendMessage({ type: "SAVE_OFFLINE_FOR_URL", url: selTab.url, title: selTab.title });
-                  if (!res?.ok) { alert("Ошибка сохранения: " + (res?.error || "")); return; }
-                  const node: TreeNode = {
-                    id: crypto.randomUUID(),
-                    title: selTab.title || selTab.url,
-                    url: selTab.url,
-                    offlineId: res.id,
-                    offlinePath: res.filename,
-                    children: [],
-                  };
-                  await updateNodesFor(active.id, [node, ...active.nodes]);
-                }}>+ В корень (офлайн)</button>
-              </div>
-            </>
-          )}
-
-          {!selTab && <div className="muted" style={{ marginTop: 8 }}>Не найдено вкладок текущего окна.</div>}
-
-          <div className="row" style={{ marginTop: 12 }}>
-            <button onClick={() => { lock(400); onExport(); }}>Экспорт JSON</button>
-            <button onClick={() => fileRef.current?.click()}>Импорт JSON</button>
-            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }}
-                   onChange={(e) => { lock(600); onImport(e); }} />
+              ))}
+            </div>
           </div>
+        )}
+      </div>
+
+      <div className="footer">
+        <div className="footer-left">
+          <span className="db-status">
+            {dbStatus === "ready"
+              ? "БД готова"
+              : dbStatus === "loading"
+              ? "Загрузка БД..."
+              : "Ошибка БД"}
+          </span>
+        </div>
+        <div className="footer-right">
+          <button
+            className="footer-btn"
+            onClick={handleExport}
+            title="Экспорт в JSON"
+            disabled={!activeId}
+          >
+            Экспорт
+          </button>
+          <button
+            className="footer-btn"
+            onClick={handleImport}
+            title="Импорт из JSON"
+          >
+            Импорт
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
         </div>
       </div>
 
-      {/* ---- НИЖНЯЯ ПАНЕЛЬ СТАТУСОМ БД ---- */}
-      <div className="footer" style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',borderTop:'1px solid var(--border)'}}>
-        <div className="footer-status">
-          SQLite: {dbStatus.backend} / {dbStatus.persisted ? "persisted" : "volatile"}
-          {" · "}last save: {fmtTime(dbStatus.lastSaveAt)}
-        </div>
-        <button onClick={() => saveNow()}>Сохранить сейчас</button>
-      </div>
+      {/* Link Preview Component */}
+      <LinkPreview url={previewUrl} position={previewPosition} />
     </div>
   );
 }
