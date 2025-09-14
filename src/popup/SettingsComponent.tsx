@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-const SettingsComponent: React.FC = () => {
+const SettingsComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const [saveFolder, setSaveFolder] = useState<string>("SavedPages");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -68,6 +68,9 @@ const SettingsComponent: React.FC = () => {
         
         <div className="settings-actions">
           <button onClick={saveSettings}>Сохранить настройки</button>
+          {onClose && (
+            <button onClick={onClose} style={{ marginLeft: '10px' }}>Закрыть</button>
+          )}
         </div>
       </div>
     </div>

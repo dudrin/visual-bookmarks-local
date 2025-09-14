@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import Settings from "./SettingsComponent"; // Adjust the path as needed
+import SettingsComponent from "./SettingsComponent"; // Adjust the path as needed
 
 const OptionsPage: React.FC = () => {
   const [saveFolder, setSaveFolder] = useState<string>("");
@@ -78,7 +78,7 @@ const OptionsPage: React.FC = () => {
       </div>
       <div className="option">
         <button onClick={() => setShowSettings(true)}>⚙️ Настройки</button>
-        {showSettings && <Settings />}
+        {showSettings && <SettingsComponent onClose={() => setShowSettings(false)} />}
       </div>
     </div>
   );

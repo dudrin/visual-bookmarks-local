@@ -24,6 +24,7 @@ import { useTreeStates } from "./useTreeStates";
 import { useSelection } from "./useSelection";
 import SelectionIndicator from "./SelectionIndicator";
 import Settings from "./Settings";
+import SettingsComponent from "./SettingsComponent";
 
 type SimpleTab = {
   id: number;
@@ -369,7 +370,11 @@ export default function App() {
     // Показываем диалог выбора
     const targetOptions = targets.map((t, i) => `${i + 1}. ${t.label}`).join('\n');
     const choice = prompt(
-      `Переместить ${selectedIds.length} элементов в:\n\n${targetOptions}\n\nВведите номер:`,
+      `Переместить ${selectedIds.length} элементов в:
+
+${targetOptions}
+
+Введите номер:`,
       '1'
     );
     
@@ -778,8 +783,7 @@ export default function App() {
         <div className="settings-modal">
           <div className="settings-backdrop" onClick={() => setShowSettings(false)} />
           <div className="settings-content">
-            <Settings />
-            <button onClick={() => setShowSettings(false)} style={{marginTop: 12}}>Закрыть</button>
+            <SettingsComponent onClose={() => setShowSettings(false)} />
           </div>
         </div>
       )}

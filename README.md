@@ -95,6 +95,10 @@ This starts development mode with hot reload and automatic rebuilding.
    - Add child nodes to any link using the "📁＋" or "🔗⇧" buttons
    - Links with children can be expanded/collapsed like folders
    - Links without children open the URL directly when clicked
+9. **Settings Management**:
+   - Access settings through the gear icon (⚙️) in the extension
+   - Configure offline page save folder
+   - Close settings without saving using the "Close" button
 
 ### Selection & Move/Copy Operations
 
@@ -190,6 +194,7 @@ src/
 - **NEW: Periodic file validation**: Added background service to periodically check saved file integrity
 - **IMPROVED: Cache management**: More robust cache update and invalidation mechanisms
 - **FIXED: Icon sizing**: Consistent CSS to ensure stable row heights regardless of icon visibility
+- **NEW: Settings management**: Added ability to close settings without saving changes
 
 ### v0.1.5.5
 - **NEW: Complete Node Comment System**: Implemented full comment functionality for all tree nodes (bookmarks and folders)
