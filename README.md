@@ -1,24 +1,24 @@
 # Visual Bookmarks Tree (Local)
 
-[![Version](https://img.shields.io/badge/version-0.1.6.0-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
+[![Version](https://img.shields.io/badge/version-0.1.7-blue.svg)](https://github.com/your-username/visual-bookmarks-local)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/chrome-extension-brightgreen.svg)](https://developer.chrome.com/extensions)
 
 A powerful Chrome extension for managing bookmarks in a visual tree structure with local SQLite storage and offline page saving capabilities.
 
-## 🆕 New in Version 0.1.6.0
+## 🆕 New in Version 0.1.7
 
-### 👁️ Page Preview
-- **Mini preview window** appears on link hover
-- **Smart positioning** to avoid screen edges
-- **Configurable delay** (800ms) to prevent accidental triggers
-- **Error handling** with fallback interface when preview fails
+### 🛠️ Bug Fixes and Improvements
+- **Fixed saved page icon persistence**: Resolved issue where open icon remained visible after deleting saved files
+- **Improved file existence checking**: Enhanced cache validation to properly detect deleted files
+- **Stable UI layout**: Fixed row height changes when saved page icons appear/disappear
+- **Enhanced error handling**: Better handling of "Download file already deleted" errors
 
-### ✅ Enhanced Selection Mode
-- **Precise selection control** - only via checkboxes and selection icons
-- **Preserved functionality** - link opening and tree navigation work normally
-- **Improved UI** with animations and visual indicators
-- **Group operations** for selected items
+### 🔄 Technical Improvements
+- **Periodic file validation**: Added background service to periodically check saved file integrity
+- **Improved cache management**: More robust cache update and invalidation mechanisms
+- **Consistent icon sizing**: Fixed CSS to ensure stable row heights regardless of icon visibility
+
 
 ## 🌟 Features
 
@@ -182,7 +182,16 @@ src/
 
 ## 📋 Changelog
 
-### v0.1.5.5 (Latest)
+### v0.1.7 (Latest)
+- **FIXED: Saved page icon persistence**: Resolved issue where open icon remained visible after deleting saved files
+- **IMPROVED: File existence checking**: Enhanced cache validation to properly detect deleted files
+- **FIXED: UI layout stability**: Fixed row height changes when saved page icons appear/disappear
+- **IMPROVED: Error handling**: Better handling of "Download file already deleted" errors
+- **NEW: Periodic file validation**: Added background service to periodically check saved file integrity
+- **IMPROVED: Cache management**: More robust cache update and invalidation mechanisms
+- **FIXED: Icon sizing**: Consistent CSS to ensure stable row heights regardless of icon visibility
+
+### v0.1.5.5
 - **NEW: Complete Node Comment System**: Implemented full comment functionality for all tree nodes (bookmarks and folders)
   - Dedicated comment button (💬) for adding/editing comments on any node
   - Visual indication of nodes with comments (subtle background highlight)

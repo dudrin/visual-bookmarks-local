@@ -326,3 +326,73 @@ async function captureTabToMHTML(tabId: number, suggested: string) {
   const item = items[0];
   return { id, filename: item?.filename || filename };
 }
+
+// Периодическая проверка сохраненных файлов
+async function checkSavedFilesPeriodically() {
+  try {
+    // Получаем кэш сохраненных страниц
+    const result = await chrome.storage.local.get(['savedPages']);
+    const savedPages = result.savedPages || {};
+    
+    // Проверяем каждый сохраненный файл
+    for (const [url, exists] of Object.entries(savedPages)) {
+      if (exists === true) {
+        // Извлекаем домен из URL для формирования имени файла
+        let fileName = 'page';
+        try {
+          const urlObj = new URL(url);
+          fileName = urlObj.hostname.replace('www.', '');
+        } catch (e) {
+          // Используем стандартное имя, если не удалось извлечь домен
+        }
+        
+        // Формируем имя файла
+        fileName = fileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+        if (fileName.length > 100) {
+          fileName = fileName.substring(0, 100);
+        }
+        if (!fileName.toLowerCase().endsWith('.mhtml')) {
+          fileName = `${fileName}.mhtml`;
+        }
+        
+        // Получаем папку сохранения
+        const folderResult = await chrome.storage.local.get(['saveFolder']);
+        const folder = folderResult.saveFolder || "SavedPages";
+        
+        // Экранируем специальные символы
+        const escapeRegExp = (string: string) => {
+          return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+        
+        // Ищем файл в загрузках
+        const results = await pDownloadsSearch({
+          filenameRegex: escapeRegExp(folder) + '[/\\\\]' + escapeRegExp(fileName)
+        });
+        
+        // Фильтруем результаты
+        const validDownloads = results.filter(download => 
+          download.state === 'complete' && 
+          (download.exists === true || 
+           (download.exists !== false && download.byExtensionId === chrome.runtime.id))
+        );
+        
+        // Если файл не найден, обновляем кэш
+        if (validDownloads.length === 0) {
+          // Обновляем кэш в storage
+          savedPages[url] = false;
+          await chrome.storage.local.set({ savedPages });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking saved files periodically:', error);
+  }
+}
+
+// Запускаем периодическую проверку каждые 5 минут
+setInterval(checkSavedFilesPeriodically, 5 * 60 * 1000);
+
+// Запускаем проверку при запуске
+chrome.runtime.onStartup.addListener(() => {
+  setTimeout(checkSavedFilesPeriodically, 10000); // Начинаем проверку через 10 секунд после запуска
+});

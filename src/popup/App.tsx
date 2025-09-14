@@ -23,6 +23,7 @@ import Tree from "./Tree";
 import { useTreeStates } from "./useTreeStates";
 import { useSelection } from "./useSelection";
 import SelectionIndicator from "./SelectionIndicator";
+import Settings from "./Settings";
 
 type SimpleTab = {
   id: number;
@@ -38,6 +39,7 @@ export default function App() {
   const [title, setTitle] = useState("");
   const [theme, setThemeState] = useState<ThemeMode>("system");
   const [forceExpand, setForceExpand] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Хук для управления состояниями деревьев
@@ -505,6 +507,7 @@ export default function App() {
           <option value="light">Светлая</option>
           <option value="dark">Тёмная</option>
         </select>
+        <button onClick={() => setShowSettings(true)} title="Настройки">⚙️</button>
       </div>
 
       <div className="main" onMouseEnter={() => setAllowHover(false)}>
@@ -770,6 +773,16 @@ export default function App() {
         </div>
         <button onClick={() => saveNow()}>Сохранить сейчас</button>
       </div>
+
+      {showSettings && (
+        <div className="settings-modal">
+          <div className="settings-backdrop" onClick={() => setShowSettings(false)} />
+          <div className="settings-content">
+            <Settings />
+            <button onClick={() => setShowSettings(false)} style={{marginTop: 12}}>Закрыть</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

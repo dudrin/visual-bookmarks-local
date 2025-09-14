@@ -1,9 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { TreeDocument, TreeNode, TreeUIState } from '../models'
 import { filterTree, highlight } from '../search'
 import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes, updateNodeComment } from '../treeOps'
 import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
+import SaveIcon from '../components/IconSave'; // иконка-сохранение
+import CheckIcon from '../components/IconCheck'; // иконка-индикатор
 
 type Props = {
   doc: TreeDocument
@@ -58,7 +60,7 @@ function pTabsGroup(opts: chrome.tabs.GroupOptions): Promise<number> {
 function pTabGroupsGet(groupId: number): Promise<chrome.tabGroups.TabGroup> {
   return new Promise((res, rej) => chrome.tabGroups.get(groupId, g => {
     const err = chrome.runtime.lastError
-    if (err) rej(err); else res(g)
+    if (err) rej(err); else res(g!)
   }))
 }
 function pTabGroupsUpdate(groupId: number, info: chrome.tabGroups.UpdateProperties): Promise<chrome.tabGroups.TabGroup> {
@@ -207,6 +209,47 @@ const NodeView: React.FC<{
   // Определяем состояние выделения для этого узла
   const isSelected = isNodeSelected ? isNodeSelected(node.id) : false
   
+  // Состояние для отслеживания наличия сохраненного файла
+  const [fileExists, setFileExists] = useState<boolean>(false);
+  const [checkingFile, setCheckingFile] = useState<boolean>(true); // По умолчанию true, чтобы показать индикатор загрузки
+  
+  // Проверяем наличие файла при монтировании компонента и при изменении URL
+  useEffect(() => {
+    const checkFileExistence = async () => {
+      if (node.url) {
+        setCheckingFile(true);
+        try {
+          // Проверяем фактическое наличие файла
+          const exists = await hasLocalCopy(node.url, node.title);
+          setFileExists(exists);
+        } catch (error) {
+          console.error('Error checking file existence:', error);
+          setFileExists(false);
+        } finally {
+          setCheckingFile(false);
+        }
+      } else {
+        setCheckingFile(false);
+      }
+    };
+    
+    checkFileExistence();
+    
+    // Слушаем события обновления кэша
+    const handleSavedPagesUpdated = (event: CustomEvent) => {
+      if (event.detail.url === node.url) {
+        setFileExists(event.detail.exists);
+        setCheckingFile(false); // Убедимся, что индикатор загрузки скрыт
+      }
+    };
+    
+    window.addEventListener('savedPagesUpdated', handleSavedPagesUpdated as EventListener);
+    
+    return () => {
+      window.removeEventListener('savedPagesUpdated', handleSavedPagesUpdated as EventListener);
+    };
+  }, [node.url, node.title]);
+  
   // Определяем начальное состояние раскрытия на основе фильтра уровней
   const shouldBeOpenByLevel = maxLevel < 0 || depth < maxLevel
   
@@ -282,6 +325,7 @@ const NodeView: React.FC<{
         targetNodeId: node.id,
         targetTreeId: docId
       })
+      
       
       // Получаем элементы для добавления по приоритету
       const itemsToAdd = await getUniversalItemsToAdd({
@@ -551,6 +595,50 @@ const NodeView: React.FC<{
           </button>
           <button className="icon-btn" title="Переименовать" onClick={renameHere}>✏️</button>
           <button className="icon-btn" title="Удалить" onClick={deleteHere}>🗑️</button>
+          {isLink && (
+            <>
+              <div className="open-saved-icon-container">
+                {checkingFile ? (
+                  // Индикатор загрузки во время проверки файла
+                  <div style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '16px', height: '16px', border: '2px solid #ccc', borderTop: '2px solid #007acc', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                  </div>
+                ) : fileExists ? (
+                  <button
+                    className="icon-btn"
+                    title="Открыть сохраненную страницу"
+                    onClick={() => openSavedPage(node.url ?? '', node.title)}
+                    style={{ fontSize: '14px' }}
+                  >
+                    📂
+                  </button>
+                ) : (
+                  <div style={{ width: '36px', height: '36px' }}></div>
+                )}
+              </div>
+              <div className="save-icon-container">
+                <button
+                  className="icon-btn"
+                  title="Сохранить страницу локально"
+                  onClick={() => savePageLocally(node.url ?? '', node.title)}
+                  style={{ fontSize: '14px' }}
+                >
+                  <SaveIcon />
+                </button>
+              </div>
+            </>
+          )}
+          {!isLink && (
+            <>
+              <div className="open-saved-icon-container">
+                <div style={{ width: '36px', height: '36px' }}></div>
+              </div>
+              <div className="save-icon-container">
+                <div style={{ width: '36px', height: '36px' }}></div>
+              </div>
+            </>
+          )}
+
         </div>
       </div>
 
@@ -867,6 +955,442 @@ const Tree: React.FC<Props> = ({ doc, onAddRootCategory, onAddCurrentTabToRoot, 
       </div>
     </div>
   )
+}
+
+// Глобальное хранилище для отслеживания сохраненных страниц
+let savedPagesCache: Record<string, boolean> = {};
+
+// Функция для обновления кэша и уведомления компонентов
+function updateSavedPagesCache(url: string, exists: boolean) {
+  // Обновляем кэш в памяти
+  if (exists) {
+    savedPagesCache[url] = true;
+  } else {
+    delete savedPagesCache[url];
+  }
+  
+  // Сохраняем в chrome.storage
+  chrome.storage.local.set({ savedPages: savedPagesCache }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Error saving to storage:', chrome.runtime.lastError);
+    } else {
+      console.log('Saved pages cache updated:', savedPagesCache);
+    }
+  });
+  
+  // Отправляем сообщение всем компонентам о необходимости обновления
+  window.dispatchEvent(new CustomEvent('savedPagesUpdated', { detail: { url, exists } }));
+}
+
+// Инициализация кэша при загрузке компонента
+chrome.storage.local.get(['savedPages'], async (result) => {
+  if (result.savedPages) {
+    savedPagesCache = result.savedPages;
+    console.log('Initialized saved pages cache:', savedPagesCache);
+    
+    // Проверяем актуальность кэша - существуют ли файлы на самом деле
+    const urls = Object.keys(savedPagesCache);
+    for (const url of urls) {
+      if (savedPagesCache[url] === true) {
+        // Получаем заголовок страницы из URL или другим способом
+        const title = getPageTitleFromUrl(url) || 'page';
+        const exists = await hasLocalCopy(url, title);
+        if (!exists) {
+          // Если файл не существует, обновляем кэш
+          updateSavedPagesCache(url, false);
+        }
+      }
+    }
+  }
+});
+
+// Вспомогательная функция для извлечения заголовка из URL
+function getPageTitleFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', '');
+    return domain;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Проверка, есть ли локальная копия (например, по url)
+async function hasLocalCopy(url: string, title: string): Promise<boolean> {
+  try {
+    // Получаем папку сохранения из настроек
+    const folder = await new Promise<string>((resolve) => {
+      chrome.storage.local.get(['saveFolder'], (result) => {
+        resolve(result.saveFolder || "SavedPages");
+      });
+    });
+    
+    // Формируем имя файла
+    let fileName = title || 'page';
+    // Удаляем недопустимые символы из имени файла
+    fileName = fileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    // Обрезаем имя файла, если оно слишком длинное
+    if (fileName.length > 100) {
+      fileName = fileName.substring(0, 100);
+    }
+    // Убедимся, что имя файла заканчивается на .mhtml
+    if (!fileName.toLowerCase().endsWith('.mhtml')) {
+      fileName = fileName + '.mhtml';
+    }
+    
+    // Проверяем кэш первым делом
+    if (savedPagesCache[url] === false) {
+      return false;
+    }
+    
+    // Экранируем специальные символы для регулярного выражения
+    const escapeRegExp = (string: string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+    
+    // Ищем файл в downloads API
+    return new Promise((resolve) => {
+      chrome.downloads.search({
+        filenameRegex: escapeRegExp(folder) + '[/\\\\]' + escapeRegExp(fileName)
+      }, (results) => {
+        try {
+          // Фильтруем результаты, оставляя только завершенные загрузки с существующими файлами
+          const validDownloads = results ? results.filter(download => {
+            // Проверяем, что загрузка завершена и файл существует
+            return download.state === 'complete' && 
+                   (download.exists === true || 
+                    (download.exists !== false && download.byExtensionId === chrome.runtime.id));
+          }) : [];
+          
+          const fileExists = validDownloads.length > 0;
+          console.log('File existence check:', fileName, 'in folder:', folder, 'Exists:', fileExists, 'Valid downloads:', validDownloads);
+          
+          // Обновляем кэш
+          updateSavedPagesCache(url, fileExists);
+          resolve(fileExists);
+        } catch (filterError) {
+          console.error('Error filtering download results:', filterError);
+          // В случае ошибки фильтрации удаляем из кэша
+          updateSavedPagesCache(url, false);
+          resolve(false);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error checking for local copy:', error);
+    // В случае ошибки удаляем из кэша
+    updateSavedPagesCache(url, false);
+    return false;
+  }
+}
+
+// Вспомогательная функция для получения заголовка страницы из кэша
+function getPageTitleFromCache(url: string): string | null {
+  // В реальной реализации здесь можно использовать кэш заголовков
+  // Пока возвращаем null, чтобы использовать URL как fallback
+  return null;
+}
+
+// Функция для открытия сохраненной страницы
+async function openSavedPage(url: string, title: string) {
+  console.log('Opening saved page:', url, title);
+  
+  // Получаем папку сохранения из настроек
+  const folder = await new Promise<string>((resolve) => {
+    chrome.storage.local.get(['saveFolder'], (result) => {
+      resolve(result.saveFolder || "SavedPages");
+    });
+  });
+  
+  // Формируем имя файла
+  let fileName = title || 'page';
+  // Удаляем недопустимые символы из имени файла
+  fileName = fileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+  // Обрезаем имя файла, если оно слишком длинное
+  if (fileName.length > 100) {
+    fileName = fileName.substring(0, 100);
+  }
+  // Убедимся, что имя файла заканчивается на .mhtml
+  if (!fileName.toLowerCase().endsWith('.mhtml')) {
+    fileName = `${fileName}.mhtml`;
+  }
+  
+  console.log('Looking for file with exact name:', `${folder}/${fileName}`);
+  console.log('Or file containing:', fileName);
+  
+  // Формируем путь к файлу в папке Загрузки
+  // Примечание: Chrome не позволяет напрямую открывать файлы по пути,
+  // поэтому мы будем использовать downloads API для открытия файла
+  try {
+    // Пытаемся найти файл в загрузках по точному совпадению имени
+    chrome.downloads.search({ filenameRegex: `${folder.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}/${fileName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}` }, async (results) => {
+      console.log('Exact name search results:', results);
+      if (results && results.length > 0) {
+        // Находим самый свежий файл
+        const file = results
+          .filter(download => download.state === 'complete' && (download.exists === true || download.exists === undefined))
+          .sort((a, b) => (b.startTime.localeCompare(a.startTime)))[0];
+          
+        if (file) {
+          console.log('Opening file with ID:', file.id);
+          try {
+            // Для blob URL используем downloads.open, для файловых URL можно использовать tabs.create
+            if (file.finalUrl && file.finalUrl.startsWith('blob:')) {
+              chrome.downloads.open(file.id);
+            } else if (file.finalUrl) {
+              chrome.tabs.create({ url: file.finalUrl, active: true });
+            } else {
+              // Резервный вариант - использовать downloads.open
+              chrome.downloads.open(file.id);
+            }
+            return;
+          } catch (error: any) {
+            console.error('Error opening file with exact match:', error);
+            // Если файл удален, удаляем его из кэша
+            if (error.message && error.message.includes('deleted')) {
+              updateSavedPagesCache(url, false);
+            }
+            // Резервный вариант - использовать downloads.open
+            try {
+              chrome.downloads.open(file.id);
+            } catch (fallbackError: any) {
+              console.error('Error opening file with fallback method:', fallbackError);
+              // Если файл удален, удаляем его из кэша
+              if (fallbackError.message && fallbackError.message.includes('deleted')) {
+                updateSavedPagesCache(url, false);
+              }
+              alert('Ошибка при открытии файла: ' + (fallbackError as Error).message);
+            }
+          }
+        }
+      }
+      
+      // Если точное совпадение не найдено, ищем по частичному совпадению
+      chrome.downloads.search({ filenameRegex: fileName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') }, async (partialResults) => {
+        console.log('Partial name search results:', partialResults);
+        if (partialResults && partialResults.length > 0) {
+          // Находим самый свежий файл
+          const file = partialResults
+            .filter(download => download.state === 'complete' && (download.exists === true || download.exists === undefined))
+            .sort((a, b) => (b.startTime.localeCompare(a.startTime)))[0];
+            
+          if (file) {
+            console.log('Opening file with ID (partial match):', file.id);
+            try {
+              // Для blob URL используем downloads.open, для файловых URL можно использовать использовать tabs.create
+              if (file.finalUrl && file.finalUrl.startsWith('blob:')) {
+                chrome.downloads.open(file.id);
+              } else if (file.finalUrl) {
+                chrome.tabs.create({ url: file.finalUrl, active: true });
+              } else {
+                // Резервный вариант - использовать downloads.open
+                chrome.downloads.open(file.id);
+              }
+              return;
+            } catch (error: any) {
+              console.error('Error opening file with partial match:', error);
+              // Если файл удален, удаляем его из кэша
+              if (error.message && error.message.includes('deleted')) {
+                updateSavedPagesCache(url, false);
+              }
+              // Резервный вариант - использовать downloads.open
+              try {
+                chrome.downloads.open(file.id);
+              } catch (fallbackError: any) {
+                console.error('Error opening file with fallback method:', fallbackError);
+                // Если файл удален, удаляем его из кэша
+                if (fallbackError.message && fallbackError.message.includes('deleted')) {
+                  updateSavedPagesCache(url, false);
+                }
+                alert('Ошибка при открытии файла: ' + (fallbackError as Error).message);
+              }
+            }
+            return;
+          }
+        }
+        
+        // Если ничего не найдено, показываем сообщение и удаляем из кэша
+        updateSavedPagesCache(url, false);
+        alert('Файл не найден. Возможно, он был удален или перемещен.');
+      });
+    });
+  } catch (error: any) {
+    console.error('Error searching for saved page:', error);
+    // В случае ошибки удаляем из кэша
+    updateSavedPagesCache(url, false);
+    alert('Ошибка при поиске файла: ' + (error as Error).message);
+  }
+}
+
+// Сохранение страницы локально
+async function savePageLocally(url: string, title: string): Promise<boolean> {
+  // Получить выбранную папку из настроек
+    const folder = await getSaveFolder();
+  
+  async function getSaveFolder(): Promise<string | null> {
+    // Replace this with your logic to retrieve the save folder, e.g., from chrome.storage
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['saveFolder'], (result) => {
+        resolve(result.saveFolder || "SavedPages");
+      });
+    });
+  }
+  
+  if (!folder) {
+    const userChoice = confirm(
+      'Папка для сохранения офлайн-копий не установлена.\n\n' +
+      'Файлы будут сохраняться в папку "SavedPages" внутри папки Загрузки вашего браузера.\n\n' +
+      'Хотите перейти в настройки, чтобы выбрать другую папку?'
+    );
+    
+    if (userChoice) {
+      // Open settings (this would require implementing a way to open the settings page)
+      // For now, we'll just proceed with the default folder
+    }
+  }
+  
+  // Получаем активную вкладку для получения точного заголовка
+  chrome.tabs.query({ active: true, currentWindow: true }, activeTabs => {
+    let actualTitle = title;
+    if (activeTabs.length > 0 && activeTabs[0].url === url) {
+      actualTitle = activeTabs[0].title || title;
+    }
+    
+    // Сохранить страницу через chrome.pageCapture
+    chrome.tabs.query({ url }, async tabs => {
+      if (tabs.length === 0) {
+        alert('Вкладка не найдена!');
+        return false;
+      }
+      
+      const tab = tabs[0];
+      const tabId = tab.id!;
+      
+      // Check if tab is still loading
+      if (tab.status !== 'complete') {
+        const shouldWait = confirm(
+          'Страница еще загружается. Для корректного сохранения необходимо дождаться полной загрузки страницы.\n\n' +
+          'Нажмите "OK", чтобы подождать 3 секунды и попытаться сохранить снова, или "Отмена" для отмены операции.'
+        );
+        
+        if (shouldWait) {
+          // Wait for 3 seconds and then try again
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Re-query the tab to get updated status
+          chrome.tabs.get(tabId, updatedTab => {
+            if (chrome.runtime.lastError) {
+              alert('Ошибка при получении информации о вкладке: ' + chrome.runtime.lastError.message);
+              return false;
+            }
+            // Try to save again
+            return attemptPageCapture(updatedTab.id!, folder, actualTitle);
+          });
+        }
+        return false;
+      }
+      
+      // Tab is loaded, proceed with capture
+      return attemptPageCapture(tabId, folder, actualTitle);
+    });
+  });
+  
+  return true;
+}
+
+// Separate function to handle the actual page capture
+function attemptPageCapture(tabId: number, folder: string | null, title: string) {
+  chrome.pageCapture.saveAsMHTML({ tabId }, mhtmlBlob => {
+    // Handle errors from pageCapture
+    if (chrome.runtime.lastError) {
+      console.error('Page capture error:', chrome.runtime.lastError);
+      const errorMessage = chrome.runtime.lastError.message || 'Unknown error';
+      if (errorMessage.includes('permissions')) {
+        alert('Ошибка: У расширения нет разрешения на захват этой страницы.\n\n' +
+              'Это может произойти с:\n' +
+              '- Внутренними страницами Chrome (chrome://)\n' +
+              '- Страницами расширений\n' +
+              '- Страницами с жесткими политиками безопасности\n' +
+              '- Страницами, которые еще загружаются\n\n' +
+              'Попробуйте обновить страницу и повторить попытку.');
+      } else {
+        alert('Ошибка при захвате страницы: ' + errorMessage);
+      }
+      return;
+    }
+    
+    // Сохранить файл в выбранную папку
+    // Убедимся, что у файла правильное расширение
+    let fileName = title || 'page';
+    // Удаляем недопустимые символы из имени файла
+    fileName = fileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    // Обрезаем имя файла, если оно слишком длинное
+    if (fileName.length > 100) {
+      fileName = fileName.substring(0, 100);
+    }
+    // Убедимся, что имя файла заканчивается на .mhtml
+    if (!fileName.toLowerCase().endsWith('.mhtml')) {
+      fileName = `${fileName}.mhtml`;
+    }
+    
+    if (!mhtmlBlob) {
+      alert('Ошибка: не удалось сохранить страницу. Страница может быть недоступна для захвата.');
+      return;
+    }
+    
+    // Проверяем тип контента блоба
+    console.log('MHTML Blob type:', mhtmlBlob.type);
+    console.log('MHTML Blob size:', mhtmlBlob.size);
+    
+    // Создаем новый Blob с правильным MIME-типом для MHTML
+    // Это поможет Chrome правильно определить тип файла
+    const mhtmlBlobWithCorrectType = new Blob([mhtmlBlob], { 
+      type: 'application/x-mimearchive' // Правильный MIME-тип для MHTML файлов
+    });
+    
+    const urlObj = URL.createObjectURL(mhtmlBlobWithCorrectType);
+    chrome.downloads.download({
+      url: urlObj,
+      filename: `${folder}/${fileName}`,
+      saveAs: false
+    }, (downloadId) => {
+      if (chrome.runtime.lastError) {
+        console.error('Download error:', chrome.runtime.lastError);
+        alert('Ошибка при сохранении файла: ' + chrome.runtime.lastError.message);
+      } else {
+        console.log('Download started with ID:', downloadId);
+        // Показываем сообщение об успешном сохранении
+        alert(`Страница успешно сохранена как "${fileName}" в папке "${folder}"\n\n` +
+              `Для открытия файла дважды кликните по нему или откройте через контекстное меню ` +
+              `"Открыть с помощью" и выберите браузер.`);
+        
+        // Обновляем информацию о сохраненных страницах
+        chrome.tabs.get(tabId, (tab) => {
+          if (chrome.runtime.lastError) {
+            console.error('Error getting tab info:', chrome.runtime.lastError);
+            return;
+          }
+          
+          if (tab && tab.url) {
+            const url = tab.url;
+            console.log('Saving page to cache:', url);
+            // Обновляем кэш через функцию updateSavedPagesCache
+            updateSavedPagesCache(url, true);
+            
+            // Также сохраняем информацию о файле для более точного поиска
+            chrome.downloads.search({ id: downloadId }, (results) => {
+              if (results && results.length > 0) {
+                const file = results[0];
+                console.log('Saved file info:', file);
+                // Можно сохранить дополнительную информацию о файле если нужно
+              }
+            });
+          }
+        });
+      }
+    });
+    // Обновить индикатор
+    // ...ваша логика обновления localCopies...
+  });
 }
 
 export default Tree
