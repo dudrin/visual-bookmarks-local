@@ -1,0 +1,229 @@
+/* Стили для режима выделения */
+
+.tree.selection-mode .node-row {
+  cursor: default;
+}
+
+.tree.selection-mode .node-row:hover {
+  background-color: #f0f0f0;
+}
+
+.selection-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ccc;
+  border-radius: 3px;
+  margin-right: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.selection-checkbox:hover {
+  border-color: #007acc;
+  background-color: #f0f8ff;
+}
+
+.selection-checkbox.checked {
+  background-color: #007acc;
+  border-color: #007acc;
+}
+
+.selection-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Стили для точки узла в режиме выделения */
+.tree.selection-mode .dot {
+  cursor: pointer;
+}
+
+.tree.selection-mode .dot:hover {
+  background-color: #ddd;
+}
+
+/* Стили для ссылок в режиме выделения */
+.tree.selection-mode .link {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.tree.selection-mode .link:hover {
+  text-decoration: underline;
+}
+
+/* Стили для выделенных узлов */
+.node-row.selected {
+  background-color: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+/* Стили для предпросмотра */
+.page-preview {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.page-preview-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid #dee2e6;
+}
+
+.page-preview-title {
+  color: #495057;
+  font-weight: 600;
+}
+
+.page-preview-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.page-preview-close:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+/* Анимация появления превью */
+.page-preview {
+  animation: fadeInPreview 0.2s ease-out;
+}
+
+@keyframes fadeInPreview {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Улучшенные стили для индикатора выделения */
+.selection-indicator {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.selection-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selection-mode-btn,
+.move-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.selection-mode-btn:hover,
+.move-mode-btn:hover {
+  background-color: #f8f9fa;
+  border-color: #007acc;
+}
+
+.selection-mode-btn.active,
+.move-mode-btn.active {
+  background-color: #007acc;
+  color: white;
+  border-color: #007acc;
+}
+
+.selection-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: #e3f2fd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.count-badge {
+  background-color: #2196f3;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+}
+
+.group-operations {
+  display: flex;
+  gap: 8px;
+}
+
+.group-operation-btn,
+.clear-selection-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.group-operation-btn:hover,
+.clear-selection-btn:hover {
+  background-color: #f8f9fa;
+}
+
+.delete-btn {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.delete-btn:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.clear-selection-btn {
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.clear-selection-btn:hover {
+  background-color: #6c757d;
+  color: white;
+}
+
+.selection-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #856404;
+}

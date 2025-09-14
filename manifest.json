@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Visual Bookmarks Tree (Local)",
-  "version": "0.1.5.5",
+  "version": "0.1.6.0",
   "description": "Графические древовидные закладки с локальным хранением и офлайн-копиями (MHTML).",
   "action": { "default_title": "Visual Bookmarks" },
   "icons": {
@@ -23,7 +23,7 @@
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:13333 http://localhost:13333"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' ws://localhost:13333 http://localhost:13333 https://www.googleapis.com;"
   },
   "web_accessible_resources": [
     { "resources": ["assets/sql-wasm.wasm"], "matches": ["<all_urls>"] }

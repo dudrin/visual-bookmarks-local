@@ -4,6 +4,7 @@ import { filterTree, highlight } from '../search'
 import { insertChild, removeNode, updateNode, moveNode, moveMultipleNodes, updateNodeComment } from '../treeOps'
 import { upsertNodes } from './sqlStorage'   // фолбэк, если не передадют onCommitNodes
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
+
 type Props = {
   doc: TreeDocument
   onAddRootCategory: () => void
@@ -451,6 +452,7 @@ const NodeView: React.FC<{
     return 'folder'
   }
 
+  // --- Новый рендер: выделение только по чекбоксу, остальные действия всегда работают ---
   return (
     <div className="node" draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>
       <div
@@ -459,8 +461,9 @@ const NodeView: React.FC<{
         aria-expanded={(!isLink || hasChildren) ? effectiveOpen : undefined}
         tabIndex={-1}
         data-node-id={node.id}
-        onClick={handleRowClick}
+        onClick={handleRowClick} // ВСЕГДА работает
       >
+        {/* Чекбокс выделения */}
         {selectionMode && (
           <div 
             className={`selection-checkbox ${isSelected ? 'checked' : ''}`}
@@ -468,9 +471,27 @@ const NodeView: React.FC<{
               e.stopPropagation()
               onToggleNodeSelection?.(node)
             }}
+            title="Выделить/снять выделение"
           />
         )}
-        <span className={'dot ' + getDotClass()} title={effectiveOpen ? 'Свернуть' : 'Развернуть'} />
+        {/* Точка раскрытия */}
+        <span 
+          className={'dot ' + getDotClass()} 
+          title={effectiveOpen ? 'Свернуть' : 'Развернуть'}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!isLink || hasChildren) {
+              if (isExpanded) {
+                onToggleExpanded(node.id, false)
+                onToggleExpanded(`closed:${node.id}`, true)
+              } else {
+                onToggleExpanded(node.id, true)
+                onToggleExpanded(`closed:${node.id}`, false)
+              }
+            }
+          }}
+        />
+        {/* Ссылка или папка */}
         {isLink ? (
           <span className="link-wrap">
             {(() => {
@@ -479,12 +500,39 @@ const NodeView: React.FC<{
                 <img className="favicon" src={src} onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden'}} alt=""/>
               ) : <span style={{ width: 16, height: 16 }} />
             })()}
-            <a className="link link-text" href={node.url} target="_blank" rel="noreferrer">
+            <a 
+              className="link link-text" 
+              href={node.url} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={(e) => {
+                // Всегда переход по ссылке
+                e.stopPropagation()
+                // Не нужно ничего для выделения!
+              }}
+            >
               <TitleWithHighlight text={node.title} q={q} isLink />
             </a>
           </span>
         ) : (
-          <span className="node-title"><TitleWithHighlight text={node.title} q={q} /></span>
+          <span 
+            className="node-title"
+            onClick={(e) => {
+              e.stopPropagation()
+              // Только раскрытие/сворачивание
+              if (hasChildren) {
+                if (isExpanded) {
+                  onToggleExpanded(node.id, false)
+                  onToggleExpanded(`closed:${node.id}`, true)
+                } else {
+                  onToggleExpanded(node.id, true)
+                  onToggleExpanded(`closed:${node.id}`, false)
+                }
+              }
+            }}
+          >
+            <TitleWithHighlight text={node.title} q={q} />
+          </span>
         )}
         <div className="node-actions">
           {/* Всегда показываем кнопку открытия для ссылок */}
