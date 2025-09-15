@@ -6,6 +6,7 @@ import { upsertNodes } from './sqlStorage'   // фолбэк, если не пе
 import { getUniversalItemsToAdd, universalItemToTreeNode, getSourceDescription, copySelectedNodes, deleteSourceNodesForIntraTreeMove } from '../universalAdd'
 import SaveIcon from '../components/IconSave'; // иконка-сохранение
 import CheckIcon from '../components/IconCheck'; // иконка-индикатор
+import CommentEditor from './CommentEditor'; // Добавляем импорт
 
 type Props = {
   doc: TreeDocument
@@ -212,7 +213,8 @@ const NodeView: React.FC<{
   // Состояние для отслеживания наличия сохраненного файла
   const [fileExists, setFileExists] = useState<boolean>(false);
   const [checkingFile, setCheckingFile] = useState<boolean>(true); // По умолчанию true, чтобы показать индикатор загрузки
-  
+  const [showCommentEditor, setShowCommentEditor] = useState<boolean>(false); // Состояние для редактора комментариев
+
   // Проверяем наличие файла при монтировании компонента и при изменении URL
   useEffect(() => {
     const checkFileExistence = async () => {
@@ -439,10 +441,19 @@ const NodeView: React.FC<{
   }
 
   const editComment = async (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    const comment = prompt('Введите комментарий', node.comment || '')?.trim() || ''
-    await saveNodes(updateNodeComment(allNodes, node.id, comment))
-  }
+    e?.stopPropagation();
+    // Открываем модальный редактор вместо prompt
+    setShowCommentEditor(true);
+  };
+
+  const handleSaveComment = async (comment: string) => {
+    await saveNodes(updateNodeComment(allNodes, node.id, comment));
+    setShowCommentEditor(false);
+  };
+
+  const handleCancelComment = () => {
+    setShowCommentEditor(false);
+  };
 
   const onDragStart = (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', node.id); e.dataTransfer.effectAllowed = 'move' }
   const onDragOver  = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
@@ -641,6 +652,14 @@ const NodeView: React.FC<{
 
         </div>
       </div>
+
+      {showCommentEditor && (
+        <CommentEditor 
+          comment={node.comment || ''} 
+          onSave={handleSaveComment} 
+          onCancel={handleCancelComment} 
+        />
+      )}
 
       {effectiveOpen && hasChildren && (
         <div className="children" role="group">
